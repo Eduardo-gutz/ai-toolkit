@@ -1,0 +1,63 @@
+# ai-toolkit
+
+Single source of truth for AI agent configurations (agents, skills, MCPs,
+rules, prompts) rendered to multiple AI coding tools via per-tool adapters.
+
+## Architecture
+
+```
+SOURCE (this repo)  →  ADAPTERS (one per tool)  →  PROJECT destination
+     tool-agnostic         tool-specific            .claude/, .opencode/, …
+```
+
+Source content lives in `source/`, one folder per resource type. Adapters in
+`adapters/` translate the canonical form into each tool's native format and
+write the result into a target project. The CLI in `bin/` orchestrates.
+
+## Supported tools (planned)
+
+- **opencode** (`.opencode/agents/`, `.opencode/commands/`, `opencode.json`)
+- **claude-code** (`.claude/agents/`, `.claude/skills/`, `.mcp.json`, `CLAUDE.md`)
+
+## Layout
+
+```
+ai-toolkit/
+├── source/
+│   ├── agents/      Markdown files w/ YAML frontmatter (canonical agent defs)
+│   ├── skills/      Agent Skills standard format (one folder per skill)
+│   ├── mcps/        Canonical MCP server definitions (JSON)
+│   ├── rules/       Rule files (markdown) merged into AGENTS.md/CLAUDE.md
+│   └── prompts/     Reusable prompt templates
+│
+├── adapters/
+│   ├── _shared/     Cross-adapter helpers (renderers, transformers)
+│   ├── opencode/    opencode adapter
+│   └── claude-code/ Claude Code adapter
+│
+├── bin/             CLI entry point
+├── tests/           Golden-file tests for each adapter
+├── ai-toolkit.config.json
+├── package.json
+└── README.md
+```
+
+## Design principles
+
+1. **Skills are portable.** Source uses the
+   [Agent Skills](https://agentskills.io/) open spec — frontmatter
+   `name`+`description` minimum, plus `license`, `compatibility`, `metadata`,
+   `allowed-tools`. The same files render to Claude Code, opencode, Cursor,
+   GitHub Copilot, etc.
+2. **Rules are written once** as `AGENTS.md`. Claude Code gets a `CLAUDE.md`
+   that imports it via `@AGENTS.md` (or a symlink).
+3. **Agents and MCPs need translation** — each tool has its own shape. The
+   canonical form is in `source/`; adapters transform per tool.
+4. **No generated files are committed** to consuming projects — regenerate
+   with the CLI.
+
+## Status
+
+Phase 0 — design and decisions. Code comes in Phase 1.
+See `~/.opencode/memory/ai_toolkit_design.md` and
+`~/.opencode/memory/ai_toolkit_research.md` for the full design history.

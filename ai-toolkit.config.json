@@ -1,0 +1,51 @@
+{
+  "$schema": "./ai-toolkit.schema.json",
+  "version": "0.0.1",
+  "source": "./source",
+
+  "profiles": {
+    "minimal": {
+      "description": "Bare minimum — no agents, one universal skill, no MCPs",
+      "agents": [],
+      "skills": [],
+      "mcps": [],
+      "rules": []
+    },
+    "backend": {
+      "description": "Backend engineer profile (Node + TypeScript focus)",
+      "agents": ["backend-engineer", "code-reviewer"],
+      "skills": ["backend-general", "typescript"],
+      "mcps": ["github"],
+      "rules": ["typescript", "git", "testing"]
+    }
+  },
+
+  "tools": {
+    "opencode": {
+      "enabled": true,
+      "skills_target": ".claude/skills",
+      "skills_strategy": "shared-via-claude-compat",
+      "rules_target": "AGENTS.md",
+      "agents_target": ".opencode/agents",
+      "commands_target": ".opencode/commands",
+      "mcp_target": "opencode.json#mcp"
+    },
+    "claude-code": {
+      "enabled": true,
+      "skills_target": ".claude/skills",
+      "rules_target": "CLAUDE.md",
+      "agents_target": ".claude/agents",
+      "commands_target": ".claude/commands",
+      "mcp_target": ".mcp.json"
+    }
+  },
+
+  "default_profile": "minimal",
+  "default_tools": ["opencode", "claude-code"],
+
+  "install": {
+    "strategy": "symlink",
+    "backup_existing": true,
+    "state_file": ".ai-toolkit.json"
+  }
+}

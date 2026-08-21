@@ -1,0 +1,35 @@
+# Node / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp/
+.pnp.js
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Generated artifacts (these are written to consuming projects, not this repo)
+/dist/
+/build/
+/coverage/
+
+# Local state files (when ai-toolkit is run from this repo for testing)
+/.ai-toolkit.json
+.ai-toolkit.local.json
+
+# OS
+Thumbs.db

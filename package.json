@@ -1,0 +1,25 @@
+{
+  "name": "ai-toolkit",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Single source of truth for AI agent configs rendered to multiple coding tools via adapters.",
+  "bin": {
+    "ai-toolkit": "./bin/ai-toolkit.mjs"
+  },
+  "scripts": {
+    "test": "node --test tests/",
+    "lint": "echo 'lint: not configured yet'",
+    "validate": "node bin/ai-toolkit.mjs validate"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.0.0",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {},
+  "author": "",
+  "license": "MIT"
+}

@@ -33,3 +33,7 @@ logs/
 
 # OS
 Thumbs.db
+/.context
+/.opencode
+/claude
+

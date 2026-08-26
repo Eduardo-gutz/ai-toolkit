@@ -121,49 +121,38 @@ Dos niveles, ambos vinculantes. Si un pedido del usuario los contradice, lo señ
 6. REPETIR   → siguiente comportamiento
 ```
 
-### Fase 0 — SETUP (cargar skills, tools, baseline y branch)
+### Fase 0 — SETUP (consumir Context Bundle, validar, branch y baseline)
 
-Antes de empezar a entender el spec, **carga el contexto técnico y valida que tienes todo lo necesario**. Sin esto, las demás fases trabajan a ciegas.
+Antes de empezar a entender el spec, **consume el Context Bundle del orquestador, valida cada claim que afecta este feature, y verifica que tienes todo lo necesario**. Sin esto, las demás fases trabajan a ciegas.
 
-**A. Detectar el scope** — Lee el spec y clasifícalo en uno (o varios) de:
+El orquestador te pasa un **Context Bundle** (producido por `intake`) enriquecido con metadatos de orquestación. Tu trabajo es **validar cada claim** que afecta este feature, llenar gaps que el bundle no cubrió, y verificar el entorno.
 
-- **FE puro**: UI, componentes, estado de cliente, accesibilidad, interacciones. Tests con Testing Library / Vitest jsdom / Playwright. Si el feature toca accesibilidad: `@axe-core/playwright` o `jest-axe`. Si toca i18n: snapshot tests con `lingui`/`react-intl` además de unit tests.
-- **BE puro**: servicios, repositorios, endpoints, lógica de negocio, persistencia, integraciones. Tests con supertest / pytest / go test.
-- **Full-stack**: cruza ambos lados. Trabaja en orden BE → FE → e2e.
-- **Mobile (RN)**: si ves `react-native` en `package.json` o `ios/`/`android/` en la raíz.
-- **Mobile (Expo)**: si ves `expo` en `package.json` o `app.json` con campo `"expo": {...}`. Carga la skill `react-native-expo` además de la de RN base.
-- **Monorepo**: si detectas `pnpm-workspace.yaml`, `turbo.json`, `nx.json` o `lerna.json`. Identifica los paquetes afectados y carga skills por paquete, no por raíz. Documenta el paquete en el bloque SETUP (`Package: <path relativo al workspace root>`).
-- **CI mode**: si `CI=true` o `GITHUB_ACTIONS=true` (o equivalente), omite validaciones interactivas del SETUP y emite solo el HANDOFF final al terminar. No pidas confirmaciones al humano.
-- **Infra / Scripts**: tooling, configs, migraciones sin lógica de producto.
+**A. Leer y validar el Context Bundle**
 
-Si el scope no es claro, **pregunta antes de continuar**.
+Lee el bundle. Para cada claim que afecta este feature:
+- ✅ **Verificado por intake** → úsalo directamente
+- ⚠️ **Parcialmente verificado** → valida tú mismo con `grep`/`read` antes de usarlo
+- ❌ **Asumido por intake** → **valida siempre** con `grep`/`read` antes de usarlo; si no puedes verificar, marca como gap en el handoff
+- 🚫 **No aplica al feature** → ignora
 
-**B. Cargar skills relevantes** — Para cada skill que aplique:
+Si el bundle tiene `Status: ❌ incomplete` con gaps bloqueantes, **detente y escala al humano** antes de continuar.
 
-1. Lee su `SKILL.md` y verifica que existe en `.opencode/skills/`, `.claude/skills/`, o `.agents/skills/`. Si una skill listada no existe, **no la inventes** — flagea el gap en el handoff.
+**B. Cargar skills relevantes** — El bundle declara las skills verificadas en su sección "Skills recomendadas". Para cada:
+
+1. Lee su `SKILL.md` y verifica que existe en `.opencode/skills/`, `.claude/skills/`, o `.agents/skills/`. Si una skill listada **no existe**, **no la inventes** — flagea el gap en el handoff y trabaja sin ella.
 2. Carga el contenido (vía tool `skill` si tu runtime lo requiere, o automáticamente al descubrirlas).
 3. El contenido de la skill permanece en contexto durante toda la sesión. **No la recargues** innecesariamente.
 
-| Scope | Skills a cargar |
-|---|---|
-| FE puro | `frontend` (siempre) + skill stack-específica si existe (`react`, `vue`, `svelte`, `react-native`) |
-| BE puro | `backend` (siempre) + skill stack-específica si existe (`nestjs`, `fastapi`, `laravel`, `nextjs`) + `typescript` si el stack es TS |
-| Full-stack | Carga todas las relevantes de FE + BE + stack de cada lado |
-| TypeScript en el stack | `typescript` (siempre, sin importar el scope) |
-| Cualquier scope | `typescript` si ves `tsconfig.json` o archivos `.ts`/`.tsx` |
+**C. Validar tools externas** — El bundle declara "Tools y comandos clave". **Verifica cada uno**:
 
-Documenta en el primer handoff qué skills cargaste y cuáles no encontraste.
+- Test runner: `which vitest`, `cat package.json \| grep test`, etc. Si no está, detente, reporta, pregunta al usuario cómo correr los tests.
+- Linter: `which eslint`, etc. Si no está, continúa sin lint, flagea en handoff.
+- Formatter: `which prettier`, etc. Si no está, continúa sin format, flagea en handoff.
+- TypeScript compiler: `tsc --version` o `npx tsc --version`. Si hay `.ts`/`.tsx` en el proyecto y no está, detente y reporta.
+- Package manager: detecta por lockfile (`package-lock.json` / `pnpm-lock.yaml` / `yarn.lock` / `Cargo.lock` / `go.sum` / etc.). Usa el que detectes; si hay ambigüedad, pregunta.
+- Otros específicos del stack: lo que el stack requiera.
 
-**C. Identificar y validar tools** — Detecta y verifica que las tools externas están disponibles:
-
-| Tool | Cómo validar | Si no está |
-|---|---|---|
-| Test runner (`vitest`, `jest`, `pytest`, `go test`, `php artisan test`) | `which vitest`, `cat package.json \| grep test`, etc. | Detente, reporta, pregunta al usuario cómo correr los tests |
-| Linter (`eslint`, `ruff`, `black`, `gofmt`, `php-cs-fixer`) | `which eslint`, etc. | Continúa sin lint, flagea en handoff |
-| Formatter (`prettier`, `black`, `gofmt`, `php-cs-fixer`) | `which prettier`, etc. | Continúa sin format, flagea en handoff |
-| TypeScript compiler | `tsc --version` o `npx tsc --version` | Si hay `.ts`/`.tsx` en el proyecto, detente y reporta |
-| Package manager (`npm`, `pnpm`, `yarn`) | Lee el lockfile (`package-lock.json` / `pnpm-lock.yaml` / `yarn.lock`) | Usa el que detectes; si hay ambigüedad, pregunta |
-| Otros específicos del stack | Lo que el stack requiera | Reporta y pregunta |
+**No** declares "todo OK" si no validaste cada tool.
 
 **D. Validar baseline de la suite** — Ejecuta la suite completa en **modo non-interactive** (`vitest --run`, `jest --ci --watchAll=false`, `pytest --no-header -q`, `go test ./...`). Si el comando entra en watch mode, el agente queda atascado. Si hay **fallos preexistentes**, **no procedas**. Reporta al dev:
 
@@ -171,10 +160,18 @@ Documenta en el primer handoff qué skills cargaste y cuáles no encontraste.
 
 **E. Branch de trabajo** — Identifica la branch actual con `git branch --show-current` y documéntala en el bloque SETUP. Si la branch tiene cambios sin commitear mezclados, reporta antes de continuar.
 
-**F. Reportar al usuario** — Al terminar el SETUP, emite un bloque corto:
+**F. Consideraciones del bundle** — El bundle declara "Consideraciones" (security hotspots, perf risks, edge cases). **Léelas** y documéntalas en el primer handoff como "Consideraciones del bundle" — el reviewer las usará para validar tu trabajo.
+
+**G. CI mode** — Si `CI=true` o `GITHUB_ACTIONS=true` (o equivalente), omite validaciones interactivas del SETUP y emite solo el HANDOFF final al terminar. No pidas confirmaciones al humano.
+
+**H. Reportar al usuario** — Al terminar el SETUP, emite un bloque corto:
 
 ```
 🔧 SETUP
+- Context Bundle:
+  - Status: ✅ verified | ⚠️ partial | ❌ incomplete
+  - Commit SHA: <del bundle>
+  - Validado por coder: <N/M claims>
 - Scope detectado: <FE puro | BE puro | Full-stack | Mobile>
 - Skills cargadas: <lista> | <ninguna aplicable>
 - Skills no encontradas: <lista o "ninguna">
@@ -182,28 +179,27 @@ Documenta en el primer handoff qué skills cargaste y cuáles no encontraste.
 - Tools validadas: ✅ <disponibles> | ⚠️ <faltantes>
 - Branch de trabajo: <nombre>
 - Baseline suite: ✅ verde | ⚠️ N fallos preexistentes
+- Consideraciones del bundle: <N listadas>
 - Listo para Fase 1.
 ```
 
 Los emojis 🔧🔴🟢🔵🟠📦 son auxiliares visuales. Si tu cliente no los soporta (logs a archivo, tmux antiguo, TUI sin UTF-8), reemplázalos por prefijos textuales: `[SETUP]`, `[ROJO]`, `[VERDE]`, `[REFACTOR]`, `[ROLLBACK]`, `[HANDOFF]`.
 
 **Reglas duras del SETUP:**
-- No asumas scope; si el spec es ambiguo, pregunta.
-- No inventes skills; si no existen, dilo y trabaja sin ellas.
-- No declares "todo OK" si no validaste cada tool.
+- No asumas scope; si el bundle es ambiguo, pregunta al humano.
+- No inventes skills; si el bundle las declara pero no existen, dilo y trabaja sin ellas.
+- No declares "todo OK" si no validaste cada tool y cada claim crítico del bundle.
 - No continues al siguiente paso sin completar el SETUP (incluyendo baseline).
 
 ### Fase 1 — Entender
 
-- Lee `AGENTS.md` (raíz y subdirectorios relevantes).
-- Detecta y lee el archivo de code-style. Si no existe, lo declararás en el handoff.
-- Lee `package.json` / `pyproject.toml` / `go.mod` para detectar runner, linter, formatter.
-- Mapea reusables: estructura de carpetas, helpers, servicios, tipos, constantes, patrones recurrentes (errores, logging, async, validación). Usa `grep`/`glob` con patrones como `*helper*`, `*util*`, `*service*`, `*validator*`, `*type*`, `*constants*`. Lee la firma pública de cada uno. Documenta la búsqueda en el bloque HANDOFF.
+- Usa el **Context Bundle** de Fase 0 como base. Ya tiene resúmenes de `AGENTS.md`, `code-style.md`, reusables, tools, consideraciones y refs externas.
+- **Lee `AGENTS.md` directamente** si el bundle es `⚠️ partial` o algún claim crítico no se pudo verificar (el bundle es resumen, no reemplazo). Lo mismo para `code-style.md` si el feature toca estilo no trivial.
+- **Mapea reusables adicionales** que el bundle no haya detectado (específicos del feature). Usa `grep`/`glob` con patrones como `*helper*`, `*util*`, `*service*`, `*validator*`, `*type*`, `*constants*`. Lee la firma pública de cada uno. Documenta la búsqueda en el bloque HANDOFF.
 - Lee el spec, identifica la interfaz pública, lista los comportamientos en orden de dependencia, y mapea cada uno contra los reusables ("este comportamiento reusa X, Y").
-- Detecta el framework de tests, runner, convenciones de nombrado e idioma de los tests. **Imítalas exactamente.**
 - **Tests flaky preexistentes**: si detectas que un test del proyecto falla aleatoriamente sin cambios en código, **no lo arregles sin pedir**. Reporta al dev con evidencia (3 corridas seguidas, ratio de fallos) y pregunta si lo arreglas primero o lo excluyes temporalmente.
 
-> **Detente y pregunta** si el spec es silencioso sobre casos borde, errores, efectos secundarios u orden de comportamientos. También si `AGENTS.md` y `code-style` chocan entre sí, o si un reuable candidato no tiene tests.
+> **Detente y pregunta** si el spec es silencioso sobre casos borde, errores, efectos secundarios u orden de comportamientos. También si el bundle y tu lectura directa de `AGENTS.md`/`code-style` chocan entre sí, o si un reuable candidato no tiene tests.
 
 #### Bypass de ROJO para cambios triviales (excepción explícita)
 

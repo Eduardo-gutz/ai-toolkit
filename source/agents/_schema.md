@@ -15,7 +15,7 @@ Each agent is a single Markdown file with YAML frontmatter (the system prompt li
   - Implementación disciplinada (coder) = `0.2`
   - Brainstorming / generación abierta > `0.5`
   - Default: omitted (runtime chooses).
-- `tools` (string[]) — **lowercase** tool names: `read`, `grep`, `glob`, `bash`, `edit`, `write`, `todowrite`, `task`, `skill`, `question`, `webfetch`. **opencode convention**: lowercase array. Claude Code adapter maps to PascalCase (`Read`, `Grep`, etc.). Tool absence = tool disabled.
+- `tools` (object) — **opencode format**: map of `tool-name: true | false` (e.g., `read: true, edit: false`). Each tool enabled explicitly; missing = disabled. **Both opencode and Claude Code use the same canonical format** (lowercase tool names). The adapter adds the corresponding PascalCase mapping only if needed (e.g., Claude Code historically used PascalCase; verify per tool).
 - `permission` (object) — opencode granular permissions map. Claude Code adapter maps `permission.bash` to `tools`/`disallowedTools`. Subkeys:
   - `permission.edit` (object) — `<glob>: allow | deny`. Use `deny` for sensitive paths (`.git/`, `node_modules/`, `source/`).
   - `permission.write` (object) — `<glob>: allow | deny`. Default deny if absent.

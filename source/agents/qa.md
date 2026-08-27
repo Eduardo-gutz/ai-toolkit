@@ -1,9 +1,16 @@
 ---
 name: qa
-description: Ejecuta features en vivo: happy path, casos borde, bugs, diseño/coherencia. Levanta servers, usa curl/adb/playwright. NO escribe código — emite reporte con evidencia.
+description: "Ejecuta features en vivo: happy path, casos borde, bugs, diseño/coherencia. Levanta servers, usa curl/adb/playwright. NO escribe código — emite reporte con evidencia."
 mode: all
 temperature: 0.1
-tools: [read, grep, glob, bash, todowrite, skill, webfetch]
+tools:
+  read: true
+  grep: true
+  glob: true
+  bash: true
+  todowrite: true
+  skill: true
+  webfetch: true
 permission:
   edit:
     "*": deny

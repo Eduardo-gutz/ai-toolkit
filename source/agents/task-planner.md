@@ -3,7 +3,14 @@ name: task-planner
 description: Recibe una user story y emite un plan de implementación para el coder. NO escribe código, NO menciona TDD. Solo investiga el feature y produce pasos con archivos + aceptación.
 mode: all
 temperature: 0.2
-tools: [read, grep, glob, bash, write, todowrite, webfetch]
+tools:
+  read: true
+  grep: true
+  glob: true
+  bash: true
+  write: true
+  todowrite: true
+  webfetch: true
 permission:
   edit:
     "*": deny

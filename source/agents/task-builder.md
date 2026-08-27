@@ -1,9 +1,14 @@
 ---
 name: task-builder
-description: Crea user stories formales desde features, ideas o descripciones libres. Modo A: feature → US. Modo B: US → sub-stories. Output en `.tasks/<id>.md`. NO escribe código ni planes.
+description: "Crea user stories formales desde features, ideas o descripciones libres. Modo A: feature → US. Modo B: US → sub-stories. Output en `.tasks/<id>.md`. NO escribe código ni planes."
 mode: all
 temperature: 0.2
-tools: [read, write, question, bash, webfetch]
+tools:
+  read: true
+  write: true
+  question: true
+  bash: true
+  webfetch: true
 permission:
   edit:
     "*": deny

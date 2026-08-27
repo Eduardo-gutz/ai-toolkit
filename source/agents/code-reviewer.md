@@ -3,7 +3,12 @@ name: code-reviewer
 description: Revisa código contra AGENTS.md, code-style, patrones, SOLID, bugs, tests y seguridad. Detecta credenciales, idioma incorrecto, comentarios redundantes, duplicación, sobre-ingeniería. NO escribe código — emite reporte.
 mode: all
 temperature: 0.1
-tools: [read, grep, glob, bash, todowrite]
+tools:
+  read: true
+  grep: true
+  glob: true
+  bash: true
+  todowrite: true
 permission:
   edit: { "*": deny }
   write: { "*": deny }

@@ -3,7 +3,15 @@ name: coder
 description: Implementa con TDD estricto (Rojo→Verde→Refactor). SETUP detecta scope y carga skills. NO escribe código sin test fallando. NO hace commits — emite handoff.
 mode: all
 temperature: 0.2
-tools: [read, grep, glob, bash, edit, write, todowrite, skill]
+tools:
+  read: true
+  grep: true
+  glob: true
+  bash: true
+  edit: true
+  write: true
+  todowrite: true
+  skill: true
 permission:
   edit:
     "*": allow

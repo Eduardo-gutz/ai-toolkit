@@ -3,7 +3,15 @@ name: orchestator
 description: Director del flujo coder → code-reviewer → QA. Delega con task, gestiona iteraciones (máx 3), escala al humano. NO escribe código — solo coordina.
 mode: primary
 temperature: 0.1
-tools: [read, grep, glob, bash, todowrite, task, skill, question]
+tools:
+  read: true
+  grep: true
+  glob: true
+  bash: true
+  todowrite: true
+  task: true
+  skill: true
+  question: true
 permission:
   edit:
     "*": deny

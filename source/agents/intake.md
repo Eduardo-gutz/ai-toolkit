@@ -3,7 +3,13 @@ name: intake
 description: Investiga contexto del proyecto (convenciones, patrones, reusables, tools, consideraciones, refs externas). Emite Context Bundle estructurado. NO decide ni implementa.
 mode: subagent
 temperature: 0.1
-tools: [read, grep, glob, bash, todowrite, webfetch]
+tools:
+  read: true
+  grep: true
+  glob: true
+  bash: true
+  todowrite: true
+  webfetch: true
 permission:
   edit:
     "*": deny

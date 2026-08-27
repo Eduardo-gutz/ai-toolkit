@@ -1,0 +1,10 @@
+{
+  "name": "test-mcp",
+  "description": "A minimal MCP for testing",
+  "transport": "http",
+  "url": "https://example.com/mcp",
+  "headers": {
+    "Authorization": "Bearer ${env:TEST_TOKEN}"
+  },
+  "enabled": true
+}

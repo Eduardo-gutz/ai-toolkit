@@ -17,7 +17,7 @@ purpose; adapters import what they need.
   agent schema.
 - `rules-renderer.mjs` — concat rule files into `AGENTS.md` body.
 - `state.mjs` — read/write `.ai-toolkit.json` state file in target project.
-- `merge-strategy.mjs` — decide merge vs replace vs symlink per resource.
+- ~~`merge-strategy.mjs`~~ — decided: always copy (simpler, no symlink complexity).
 
 ## Conventions
 

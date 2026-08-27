@@ -8,10 +8,8 @@ writes them into the target project.
 - **Agents** → `.opencode/agents/<name>.md`
   - Frontmatter: `description` (req), `mode`, `model`, `permission`, etc.
   - Filename = agent name.
-- **Skills** → `.claude/skills/<name>/SKILL.md` (recommended; shared with
-  Claude Code) OR `.opencode/skills/<name>/SKILL.md`.
-  - opencode reads both, and also `.claude/skills/` for compat. Default to
-    `.claude/skills/` for cross-tool sharing.
+- **Skills** → `.opencode/skills/<name>/SKILL.md` (opencode native path).
+  - When installing for claude-code too, skills go to `.claude/skills/` (Claude Code's native path). Each tool reads from its own folder.
 - **Rules** → `AGENTS.md` at project root.
 - **MCPs** → `opencode.json` under `mcp`. Merge with any existing project
   config (don't clobber unrelated keys).
@@ -24,7 +22,7 @@ writes them into the target project.
 - Frontmatter `tools` (deprecated) → use `permission` map instead.
 - `permission` map supports per-tool glob patterns.
 - MCP `type: "local"`/`"remote"` (NOT `stdio`/`http`).
-- opencode LEE `.claude/skills/` — no need to duplicate.
+- (Old compat note: opencode used to read from `.claude/skills/` for compat. We now use the native `.opencode/skills/` path.)
 
 ## Adapter contract
 

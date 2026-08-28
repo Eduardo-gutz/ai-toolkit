@@ -54,11 +54,6 @@ export async function initCommand({ flags, config, configPath, projectDir, toolk
     throw new Error(`Profile "${profileName}" not found in config.`);
   }
 
-  const state = readState(projectDir);
-  state.installed_at = new Date().toISOString();
-  state.profile = profileName;
-  writeState(projectDir, state);
-
   for (const tool of tools) {
     if (!config.tools[tool]) {
       console.warn(`Tool "${tool}" not configured. Skipping.`);
@@ -86,6 +81,15 @@ export async function initCommand({ flags, config, configPath, projectDir, toolk
   // path). When installing only for opencode, only .opencode/skills/ is
   // created. claude-code-only install puts them in .claude/skills/.
   // Each tool reads from its own folder.
+
+  // Write state metadata LAST. If any adapter above failed (or the user
+  // SIGINT'd), state stays as it was before this run — no half-truth about
+  // installed_at or profile. Adapters have already written their per-tool
+  // entries during install(); this only adds global metadata.
+  const state = readState(projectDir);
+  state.installed_at = new Date().toISOString();
+  state.profile = profileName;
+  writeState(projectDir, state);
 
   console.log(`\nDone. State file: ${resolve(projectDir, '.ai-toolkit.json')}`);
 }

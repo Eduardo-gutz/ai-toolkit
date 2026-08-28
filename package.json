@@ -1,6 +1,6 @@
 {
   "name": "ai-toolkit",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Single source of truth for AI agent configs rendered to multiple coding tools via adapters.",

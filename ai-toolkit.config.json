@@ -1,24 +1,7 @@
 {
   "$schema": "./ai-toolkit.schema.json",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "source": "./source",
-
-  "profiles": {
-    "minimal": {
-      "description": "Bare minimum — no agents, one universal skill, no MCPs",
-      "agents": [],
-      "skills": [],
-      "mcps": [],
-      "rules": []
-    },
-    "backend": {
-      "description": "Backend engineer profile (Node + TypeScript focus)",
-      "agents": ["backend-engineer", "code-reviewer"],
-      "skills": ["backend-general", "typescript"],
-      "mcps": ["github"],
-      "rules": ["typescript", "git", "testing"]
-    }
-  },
 
   "tools": {
     "opencode": {
@@ -40,7 +23,6 @@
     }
   },
 
-  "default_profile": "minimal",
   "default_tools": ["opencode", "claude-code"],
 
   "install": {

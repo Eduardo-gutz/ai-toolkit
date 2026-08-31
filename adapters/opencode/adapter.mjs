@@ -35,40 +35,47 @@ const OPENCODE_CONFIG = 'opencode.json';
 const AGENTS_MD = 'AGENTS.md';
 
 /**
- * Install all resources from source to target project for opencode.
- * @param {{source: string, target: string, config: object}} args
+ * Install resources from source to target project for opencode.
+ * @param {{source: string, target: string, config: object, types: string[]}} args
+ *   types: subset of ['agents', 'skills', 'mcps', 'rules', 'commands'].
+ *          Empty/missing = install all four supported types.
+ *          'commands' is silently ignored here (no walker yet).
  */
-export async function install({ source, target, config }) {
+export async function install({ source, target, config, types }) {
   const state = readState(target);
-  state.installed_at = new Date().toISOString();
+  const want = (t) => !types || types.includes(t);
 
-  await installAgents(source, target, state);
-  await installSkills(source, target, state);
-  await installMcps(source, target, state, config);
-  await installRules(source, target, state);
+  if (want('agents')) await installAgents(source, target, state);
+  if (want('skills')) await installSkills(source, target, state);
+  if (want('mcps'))   await installMcps(source, target, state, config);
+  if (want('rules'))  await installRules(source, target, state);
+  // types.includes('commands') → no-op (deferred)
 
   writeState(target, state);
 }
 
 /**
- * Sync = reinstall all resources (idempotent).
- * @param {{source: string, target: string, config: object}} args
+ * Sync = reinstall resources (idempotent). When `types` is provided,
+ * only those types are reinstalled; otherwise all supported types.
+ * @param {{source: string, target: string, config: object, types?: string[]}} args
  */
-export async function sync({ source, target, config }) {
-  await install({ source, target, config });
+export async function sync({ source, target, config, types }) {
+  await install({ source, target, config, types });
   const state = readState(target);
   recordSync(state, 'opencode');
   writeState(target, state);
 }
 
 /**
- * Remove all resources installed by ai-toolkit from the target project.
- * @param {{target: string, config: object}} args
+ * Remove resources installed by ai-toolkit from the target project.
+ * When `types` is provided, only resources of those types are removed.
+ * @param {{target: string, config: object, types?: string[]}} args
  */
-export async function remove({ target, config }) {
+export async function remove({ target, config, types }) {
   const state = readState(target);
 
   for (const [type, names] of Object.entries(state.tools?.opencode || {})) {
+    if (types && !types.includes(type)) continue;
     for (const name of Object.keys(names)) {
       await removeResource(target, type, name);
       recordRemoved(state, 'opencode', type, name);

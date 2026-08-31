@@ -62,7 +62,7 @@ Global flags:
                      (1) --config, (2) --global ($HOME/.ai-toolkit/),
                      (3) projectDir/, (4) toolkit bundled.
   --tools=<a,b>      Tools to install (e.g., opencode, claude-code). Omit value to use config.default_tools.
-  --profile=<name>   Override profile (minimal, backend, etc.)
+  --types=<csv>      Resource types to install: agents, skills, mcps, rules, commands. Default: all.
   --project=<path>   Target project directory (default: cwd). Use $HOME or absolute path for global installs.
   --global           Boolean. Shorthand for --project=$HOME/.ai-toolkit. Use to install to your user-level config.
   --yes              Boolean. Non-interactive mode: use defaults, don't prompt. Required for destructive commands in CI.
@@ -70,7 +70,7 @@ Global flags:
   --version, -v      Show version
 
 Flag types:
-  - Value-bearing flags (--tools, --project, --profile, --config): --flag alone = use config default.
+  - Value-bearing flags (--tools, --types, --project, --config): --flag alone = use config default.
   - Boolean flags (--yes, --global): --flag alone = true. --yes=false is treated as --yes=true.
 
 Examples:

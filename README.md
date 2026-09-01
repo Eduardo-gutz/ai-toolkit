@@ -14,10 +14,10 @@ Source content lives in `source/`, one folder per resource type. Adapters in
 `adapters/` translate the canonical form into each tool's native format and
 write the result into a target project. The CLI in `bin/` orchestrates.
 
-## Supported tools (planned)
+## Supported tools
 
-- **opencode** (`.opencode/agents/`, `.opencode/commands/`, `opencode.json`)
-- **claude-code** (`.claude/agents/`, `.claude/skills/`, `.mcp.json`, `CLAUDE.md`)
+- **opencode** (`.opencode/agents/`, `.opencode/skills/`, `opencode.json`, `AGENTS.md`)
+- **claude-code** (`.claude/agents/`, `.claude/skills/`, `.mcp.json`, `CLAUDE.md` + `AGENTS.md`)
 
 ## Layout
 
@@ -58,6 +58,10 @@ ai-toolkit/
 
 ## Status
 
-Phase 0 — design and decisions. Code comes in Phase 1.
-See `~/.opencode/memory/ai_toolkit_design.md` and
-`~/.opencode/memory/ai_toolkit_research.md` for the full design history.
+**Shipped**: Phase 0 (design) + Phase 1 (opencode adapter + CLI) + Phase 2 (claude-code adapter + shared helpers) + Phase 0.5 (security hardening: path traversal closed, adapter injection closed for all commands after loadAdapter migration, value-less flag crashes fixed).
+
+**Next**: Phase 1.5 — interactive init fix (`select` → `checkbox`) + `CLAUDE.md` with `@AGENTS.md` import.
+
+Test status: **236/236 passing**.
+
+See `.context/WHY.md` for the full design history and roadmap.

@@ -61,7 +61,8 @@ Global flags:
   --config=<path>    Path to ai-toolkit.config.json. Searched in this order:
                      (1) --config, (2) --global ($HOME/.ai-toolkit/),
                      (3) projectDir/, (4) toolkit bundled.
-  --tools=<a,b>      Tools to install (e.g., opencode, claude-code). Omit value to use config.default_tools.
+  --tools=<a,b>      Tools to install (e.g., opencode, claude-code). For init: omit value to use config.default_tools.
+                      For sync: omit value = auto-detect from state file (.ai-toolkit.json) with filesystem fallback.
   --types=<csv>      Resource types to install: agents, skills, mcps, rules, commands. Default: all.
   --project=<path>   Target project directory (default: cwd). Use $HOME or absolute path for global installs.
   --global           Boolean. Shorthand for --project=$HOME/.ai-toolkit. Use to install to your user-level config.

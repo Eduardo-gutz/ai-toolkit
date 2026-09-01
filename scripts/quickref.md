@@ -60,7 +60,7 @@ node /path/to/ai-toolkit/bin/ai-toolkit.mjs init \
 
 | Flag | Effect |
 |---|---|
-| `--tools=opencode,claude-code` | Override target tools (default: `config.default_tools`) |
+| `--tools=opencode,claude-code` | **For init**: override target tools (default: `config.default_tools`). **For sync**: omit value = auto-detect from `.ai-toolkit.json` state file (filesystem fallback when state is empty). |
 | `--project=<path>` | Target project directory (default: cwd) |
 | `--global` | Shorthand for `--project=$HOME/.ai-toolkit` (user-level) |
 | `--config=<path>` | Path to `ai-toolkit.config.json` (default: toolkit's own) |
@@ -89,9 +89,16 @@ ai-toolkit list --global                # What's in user-level
 ## 🧪 Test
 
 ```bash
-npm test                                    # 28 tests, all passing
+npm test                                    # 236 tests, all passing
 node --test $(find tests -name '*.test.mjs')  # Same, explicit
 ```
+
+**Coverage notes**:
+- `parseFlags` (Fase 0.5): 23 unit tests cover happy path + value-less flags + boolean flags + `--config=path/with=equals.json` + POSIX separator.
+- `loadAdapter` (Fase 0): 9 tests cover whitelist (rejects tools not in `config.tools`), path-traversal, absolute paths, empty config.
+- `remove-safety` (Fase 0): 9 tests use a **sentinel** directory outside the project to verify `remove skills ..` cannot escape.
+- `parse-tools-flag` (Fase 0.5): 11 tests cover null/false/empty/number/array/object/true.
+- `doctor-command` (Fase 0.5 R2 regression): 4 tests verify doctor does NOT report adapters as missing when config is null.
 
 ## 🔍 Inspect what was installed
 

@@ -49,7 +49,7 @@ export async function syncCommand({ flags, config, configPath, projectDir, toolk
   const errors = [];
 
   for (const tool of tools) {
-    if (!config.tools[tool] || typeof config.tools[tool] !== 'object') {
+    if (!config.tools[tool] || typeof config.tools[tool] !== 'object' || Array.isArray(config.tools[tool])) {
       console.warn(`Tool "${tool}" not configured properly. Skipping.`);
       continue;
     }

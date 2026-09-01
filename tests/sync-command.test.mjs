@@ -453,6 +453,35 @@ test('sync: throws if config.tools is an array', async () => {
   }
 });
 
+// ─── H1: config.tools[tool] = [] (array as value) ─────────────
+
+test('sync: skips with warning when config.tools[tool] is an array (H1)', async () => {
+  // Array value slips through typeof check (typeof [] === 'object').
+  // Best-effort defaults: warn-skip, not throw.
+  // Sync's contract is broader than init's — unknown tools warn-skip
+  // rather than throw, because sync is idempotent and best-effort.
+  const dir = await mkdtemp(join(tmpdir(), 'aitk-sync-toolarrval-'));
+  try {
+    process.chdir(TOOLKIT);
+    const { syncCommand } = await import(SYNC_CMD);
+    const config = {
+      ...VALID_CONFIG_FULL,
+      tools: { opencode: [] },  // value is array
+      default_tools: ['opencode'],
+    };
+    // Should not throw — sync best-effort
+    await syncCommand({
+      flags: {},
+      config,
+      configPath: '/x.json',
+      projectDir: dir,
+      toolkitRoot: TOOLKIT,
+    });
+  } finally {
+    await rm(dir, { recursive: true });
+  }
+});
+
 // ─── Regression: --tools whitespace + dedupe (F3) ─────────────
 
 test('sync: --tools="opencode, claude-code" trims whitespace', async () => {

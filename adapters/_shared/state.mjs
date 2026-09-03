@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const STATE_FILE = '.ai-toolkit.json';
@@ -101,4 +102,65 @@ export function recordRemoved(state, tool, type, name) {
   if (state.tools?.[tool]?.[type]?.[name]) {
     delete state.tools[tool][type][name];
   }
+}
+
+/**
+ * Delete the state file from a target project. Symmetric to writeState.
+ * Silently no-ops if the file doesn't exist (the common case after a
+ * `remove --purge` second run, or after a fresh project).
+ *
+ * Async because unlink() returns a Promise — must be awaited so callers
+ * (e.g., `remove --purge`) can verify the file is gone before continuing.
+ *
+ * @param {string} targetDir
+ * @returns {Promise<void>}
+ */
+export async function deleteState(targetDir) {
+  const file = join(targetDir, STATE_FILE);
+  try {
+    await unlink(file);
+  } catch (err) {
+    // ENOENT (file already gone) is expected; rethrow other errors.
+    if (err.code !== 'ENOENT') {
+      throw err;
+    }
+  }
+}
+
+/**
+ * Recursively prune empty parent keys from `state.tools`. After a series
+ * of `recordRemoved(...)` calls, parents like `state.tools[tool][type]` may
+ * remain as empty objects `{}`. This cleans them so
+ * `Object.keys(state.tools).length === 0` is true when nothing remains —
+ * a precondition for `remove --purge` to delete the state file.
+ *
+ * Mutates and returns `state`.
+ *
+ * @param {object} state
+ * @returns {object} the same state object, mutated
+ */
+export function pruneEmpty(state) {
+  if (!state || !state.tools) return state;
+
+  for (const tool of Object.keys(state.tools)) {
+    const toolData = state.tools[tool];
+    if (!toolData || typeof toolData !== 'object') {
+      delete state.tools[tool];
+      continue;
+    }
+    for (const type of Object.keys(toolData)) {
+      const typeData = toolData[type];
+      if (
+        !typeData
+        || typeof typeData !== 'object'
+        || Object.keys(typeData).length === 0
+      ) {
+        delete toolData[type];
+      }
+    }
+    if (Object.keys(toolData).length === 0) {
+      delete state.tools[tool];
+    }
+  }
+  return state;
 }

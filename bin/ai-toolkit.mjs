@@ -5,10 +5,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { initCommand } from './commands/init.mjs';
 import { syncCommand } from './commands/sync.mjs';
-import { listCommand } from './commands/list.mjs';
 import { validateCommand } from './commands/validate.mjs';
-import { doctorCommand } from './commands/doctor.mjs';
-import { addCommand } from './commands/add.mjs';
 import { removeCommand } from './commands/remove.mjs';
 import { parseFlags } from './lib/parse-flags.mjs';
 
@@ -25,25 +22,13 @@ const COMMANDS = {
     fn: syncCommand,
     desc: 'Regenerate target project config from source (idempotent)',
   },
-  list: {
-    fn: listCommand,
-    desc: 'List installed resources [--tools=opencode,claude-code]',
-  },
   validate: {
     fn: validateCommand,
     desc: 'Validate source canonical format and config',
   },
-  doctor: {
-    fn: doctorCommand,
-    desc: 'Diagnose installer health (tool version, env, paths)',
-  },
-  add: {
-    fn: addCommand,
-    desc: 'Add a resource to the target project <type> <name>',
-  },
   remove: {
     fn: removeCommand,
-    desc: 'Remove a resource from the target project <type> <name>',
+    desc: 'Remove resources [--types=<csv>] [--tools=<list>] [--yes] [--purge]',
   },
 };
 

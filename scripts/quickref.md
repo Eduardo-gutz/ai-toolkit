@@ -50,10 +50,7 @@ node /path/to/ai-toolkit/bin/ai-toolkit.mjs init \
 |---|---|
 | `init --tools=...` | First-time install in a project |
 | `sync` | Re-install (idempotent); pick up new resources |
-| `list` | Show what's installed in the project |
 | `validate` | Check source integrity (no I/O) |
-| `doctor` | Diagnose installer health |
-| `add <type> <name>` | Add a specific resource (e.g., `add agents coder`) |
 | `remove <type> <name>` | Remove a specific resource |
 
 ## 🔧 Common flags
@@ -79,17 +76,12 @@ The installer can target any directory — the distinction is just where symlink
 | **Global** (user-level) | `init --global` | Symlinks point to source. State file goes to `~/.ai-toolkit/.ai-toolkit.json`. Affects all your projects that symlink to `~/.ai-toolkit/`. |
 | **Custom** | `init --project=$HOME/.config/ai-toolkit` | Same as global, but at a different path. |
 
-Each target has its **own independent state file**. They don't interfere with each other. Use `list` with the same flag to see what's in each:
-
-```bash
-ai-toolkit list --project=$PWD          # What's in this project
-ai-toolkit list --global                # What's in user-level
-```
+Each target has its **own independent state file**. They don't interfere with each other.
 
 ## 🧪 Test
 
 ```bash
-npm test                                    # 236 tests, all passing
+npm test                                    # 260 tests, all passing
 node --test $(find tests -name '*.test.mjs')  # Same, explicit
 ```
 
@@ -98,7 +90,6 @@ node --test $(find tests -name '*.test.mjs')  # Same, explicit
 - `loadAdapter` (Fase 0): 9 tests cover whitelist (rejects tools not in `config.tools`), path-traversal, absolute paths, empty config.
 - `remove-safety` (Fase 0): 9 tests use a **sentinel** directory outside the project to verify `remove skills ..` cannot escape.
 - `parse-tools-flag` (Fase 0.5): 11 tests cover null/false/empty/number/array/object/true.
-- `doctor-command` (Fase 0.5 R2 regression): 4 tests verify doctor does NOT report adapters as missing when config is null.
 
 ## 🔍 Inspect what was installed
 

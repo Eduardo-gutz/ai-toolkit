@@ -99,14 +99,6 @@ test('dispatch: unknown command → stderr + help + exit 1', async () => {
 
 // ─── Help text integrity ────────────────────────────────────
 
-test('dispatch: add command description has <type> <name> (Fix 1.2)', async () => {
-  const { stdout } = await capture((inject) =>
-    dispatch({ argv: ['--help'], ...inject })
-  );
-  assert.doesNotMatch(stdout, /<type>name>/, 'typo from review must be gone');
-  assert.match(stdout, /add\s+Add a resource.*<type> <name>/);
-});
-
 // ─── Command dispatch with injected registry ────────────────
 
 test('dispatch: invokes the named command with parsed flags', async () => {
@@ -416,11 +408,47 @@ test('dispatch: --global wins over --project when both given', async () => {
   });
 });
 
-test('dispatch: showHelp lists all 7 commands', async () => {
+test('dispatch: showHelp lists the 4 remaining commands', async () => {
   const { stdout } = await capture((inject) =>
     dispatch({ argv: ['--help'], ...inject })
   );
-  for (const cmd of ['init', 'sync', 'list', 'validate', 'doctor', 'add', 'remove']) {
+  for (const cmd of ['init', 'sync', 'validate', 'remove']) {
     assert.match(stdout, new RegExp(`\\b${cmd}\\b`), `help should list command: ${cmd}`);
   }
+  assert.doesNotMatch(stdout, /\bdoctor\b/, 'help should NOT list doctor');
+  assert.doesNotMatch(stdout, /\badd\s+/, 'help should NOT list add');
+  assert.doesNotMatch(stdout, /\blist\s+/, 'help should NOT list list');
+});
+
+// ─── Unknown command for removed commands (US #2-#5) ─────────
+// After removing doctor/add/list from the registry, invoking them must
+// produce the same "Unknown command" rejection as any other invalid token.
+// We use the REAL COMMANDS map (no `commands` injection) to verify the
+// registry is the source of truth.
+
+test('dispatch: doctor → Unknown command (uses real registry)', async () => {
+  const { exitCode, stdout, stderr } = await capture((inject) =>
+    dispatch({ argv: ['doctor'], ...inject })
+  );
+  assert.equal(exitCode, 1);
+  assert.match(stderr, /Unknown command: doctor/);
+  assert.match(stdout, /Usage: ai-toolkit/);
+});
+
+test('dispatch: add → Unknown command (uses real registry)', async () => {
+  const { exitCode, stdout, stderr } = await capture((inject) =>
+    dispatch({ argv: ['add'], ...inject })
+  );
+  assert.equal(exitCode, 1);
+  assert.match(stderr, /Unknown command: add/);
+  assert.match(stdout, /Usage: ai-toolkit/);
+});
+
+test('dispatch: list → Unknown command (uses real registry)', async () => {
+  const { exitCode, stdout, stderr } = await capture((inject) =>
+    dispatch({ argv: ['list'], ...inject })
+  );
+  assert.equal(exitCode, 1);
+  assert.match(stderr, /Unknown command: list/);
+  assert.match(stdout, /Usage: ai-toolkit/);
 });

@@ -8,7 +8,7 @@
     "ai-toolkit": "./bin/ai-toolkit.mjs"
   },
   "scripts": {
-    "test": "node --test $(find tests -name '*.test.mjs')",
+    "test": "node --test 'tests/**/*.test.mjs'",
     "lint": "echo 'lint: not configured yet'",
     "validate": "node bin/ai-toolkit.mjs validate",
     "validate:frontmatter": "node scripts/validate-frontmatter.mjs"

@@ -1,19 +1,21 @@
-import { mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, rm, unlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { listAgents } from '../_shared/agents-walker.mjs';
-import { listSkills, readSkill, listSkillFiles } from '../_shared/skills-walker.mjs';
-import { listMcps, readMcp } from '../_shared/canonical-mcp.mjs';
+import { listSkills, listSkillFiles } from '../_shared/skills-walker.mjs';
+import { listMcps } from '../_shared/canonical-mcp.mjs';
 import { canonicalToOpencode } from '../_shared/mcp-transform.mjs';
 import { listRules, renderRules } from '../_shared/rules-renderer.mjs';
 import { installResource } from '../_shared/install.mjs';
+import { removeIfEmpty, removeJsonKeys } from '../_shared/cleanup-if-empty.mjs';
+import { assertSafeName } from '../_shared/safe-name.mjs';
+import { makeResourcePaths, makeCleanupDirs } from '../_shared/tool-paths.mjs';
 import {
   readState,
   writeState,
   recordInstalled,
   recordSync,
   recordRemoved,
-  getInstalled,
 } from '../_shared/state.mjs';
 
 /**
@@ -32,7 +34,18 @@ import {
 const OPENCODE_AGENTS_DIR = '.opencode/agents';
 const OPENCODE_SKILLS_DIR = '.opencode/skills';
 const OPENCODE_CONFIG = 'opencode.json';
+const OPENCODE_ROOT = '.opencode';
 const AGENTS_MD = 'AGENTS.md';
+
+/**
+ * Filesystem markers used by `sync`'s auto-detect fallback. If any of these
+ * paths exist in the project directory, the tool is considered physically
+ * installed. Read by sync.mjs via the loaded adapter module. Defining
+ * markers HERE (not in the command) keeps the OCP contract: adding a new
+ * tool only requires creating its adapter with its own `fsMarkers` —
+ * sync.mjs does not need to change.
+ */
+export const fsMarkers = [OPENCODE_AGENTS_DIR, OPENCODE_SKILLS_DIR, OPENCODE_CONFIG];
 
 /**
  * Install resources from source to target project for opencode.
@@ -83,21 +96,45 @@ export async function remove({ target, config, types }) {
   }
 
   writeState(target, state);
+
+  await postRemoveCleanup(target);
 }
 
 /**
- * Validate canonical source against opencode adapter requirements.
- * @param {{source: string, config: object}} args
+ * Best-effort cleanup of the structure install() created.
+ * Each step is a no-op if the path doesn't exist or isn't empty.
  */
+async function postRemoveCleanup(target) {
+  await removeIfEmpty(`${target}/.opencode/agents`);
+  await removeIfEmpty(`${target}/.opencode/skills`);
+  await removeIfEmpty(`${target}/.opencode`);
+
+  const agentsMd = `${target}/AGENTS.md`;
+  if (existsSync(agentsMd)) {
+    await unlink(agentsMd);
+  }
+
+  await removeJsonKeys(`${target}/opencode.json`, 'mcp');
+}
+
+/** Smoke test: ensure no broken resources. */
 export async function validate({ source, config }) {
-  // Loaders already validate per-resource (throw on error).
-  // This is a smoke test to ensure no broken resources.
   listAgents(source);
   listSkills(source);
   listMcps(source);
   listRules(source);
   return { ok: true };
 }
+
+// Thin wrapper over makeResourcePaths — see adapters/_shared/tool-paths.mjs.
+export const resourcePaths = makeResourcePaths({
+  agentsDir: OPENCODE_AGENTS_DIR,
+  skillsDir: OPENCODE_SKILLS_DIR,
+  assertSafeName,
+});
+
+// Thin wrapper over makeCleanupDirs — see adapters/_shared/tool-paths.mjs.
+export const cleanupDirs = makeCleanupDirs({ rootDir: OPENCODE_ROOT });
 
 // ─── Internal helpers ─────────────────────────────────────────────────
 

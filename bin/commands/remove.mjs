@@ -11,45 +11,10 @@ import {
   pruneEmpty,
 } from '../../adapters/_shared/state.mjs';
 import { loadAdapter } from '../../adapters/_shared/load-adapter.mjs';
+import { assertSafeName } from '../../adapters/_shared/safe-name.mjs';
 import { parseToolsFlag } from '../lib/parse-tools-flag.mjs';
 import { parseTypesFlag } from '../lib/parse-types-flag.mjs';
 import { ALL_TYPES } from './init.mjs';
-
-/**
- * Validate that a resource name is safe to use in file paths.
- *
- * SECURITY: previously, names from CLI args were interpolated directly into
- * filesystem paths (e.g. `${projectDir}/.claude/skills/${name}`), which meant
- *   `ai-toolkit remove skills ..`
- * would resolve to the parent of the project and `rm -rf` it. This rejects
- * any path-traversal characters and limits to a safe alphabet.
- *
- * Rules:
- *   - 1..128 chars
- *   - ASCII letters, digits, '-', '_', '.'
- *   - Cannot start with '.'
- *   - Cannot be exactly '.' or '..'
- */
-function assertSafeName(name, type) {
-  if (typeof name !== 'string' || name.length === 0) {
-    throw new Error(`Invalid ${type} name: must be a non-empty string`);
-  }
-  if (name.length > 128) {
-    throw new Error(`Invalid ${type} name "${name}": max 128 chars`);
-  }
-  if (name === '.' || name === '..') {
-    throw new Error(`Invalid ${type} name "${name}"`);
-  }
-  if (name.startsWith('.')) {
-    throw new Error(`Invalid ${type} name "${name}": cannot start with "."`);
-  }
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(name)) {
-    throw new Error(
-      `Invalid ${type} name "${name}". ` +
-      `Allowed: letters, digits, "_", "-", "." (not as first char)`
-    );
-  }
-}
 
 /**
  * Build a project-relative path and verify it stays inside the project root.

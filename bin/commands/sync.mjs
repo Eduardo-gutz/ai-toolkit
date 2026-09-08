@@ -7,18 +7,28 @@ import { loadAdapter } from '../../adapters/_shared/load-adapter.mjs';
 import { readState, writeState } from '../../adapters/_shared/state.mjs';
 
 /**
- * Filesystem markers per tool: if any of these paths exist in the project
- * directory, the tool is considered physically installed. Used by sync as a
- * FALLBACK for recovery scenarios (state file empty/missing) and to verify
- * state-based detection candidates (so stale state entries are filtered).
+ * Resolve an adapter (loading it through loadAdapter) and check whether any
+ * of its declared `fsMarkers` paths exist in `projectDir`.
+ *
+ * Returns `false` if the adapter cannot be loaded (tool not in config,
+ * adapter file missing, etc.) — the same semantics as the old hardcoded
+ * map's `|| []` fallback. Adapters that don't export `fsMarkers` are
+ * treated as "no markers" → "not installed".
+ *
+ * Defining fsMarkers in the adapter (not here) is the OCP contract: adding
+ * a new tool only requires creating its adapter with its own fsMarkers —
+ * sync.mjs does not need to change.
  */
-const TOOL_FS_MARKERS = {
-  opencode: ['.opencode/agents', '.opencode/skills', 'opencode.json'],
-  'claude-code': ['.claude/agents', '.claude/skills', 'CLAUDE.md', '.mcp.json'],
-};
+async function loadAdapterForFsCheck(tool, config, toolkitRoot) {
+  try {
+    return await loadAdapter(tool, config, toolkitRoot);
+  } catch {
+    return null;
+  }
+}
 
-function isInstalledOnFs(projectDir, tool) {
-  const markers = TOOL_FS_MARKERS[tool] || [];
+function isAdapterInstalledOnFs(projectDir, adapter) {
+  const markers = adapter?.fsMarkers || [];
   return markers.some((m) => existsSync(resolve(projectDir, m)));
 }
 
@@ -36,26 +46,35 @@ function isInstalledOnFs(projectDir, tool) {
  *      RECOVERY scenario — print it so the user knows to run `init`.
  *
  * Constrained to tools also in config.tools: auto-detect never picks up a
- * tool that isn't configured.
+ * tool that isn't configured. fsMarkers come from each loaded adapter's
+ * `fsMarkers` export — sync.mjs has no hardcoded marker map.
  */
-function detectInstalledTools(projectDir, configTools) {
+async function detectInstalledTools(projectDir, configTools, config, toolkitRoot) {
   const state = readState(projectDir);
   const stateToolKeys = Object.keys(state.tools || {});
 
   if (stateToolKeys.length > 0) {
     // State is primary. Filter through config.tools whitelist AND fs-marker
-    // verification. Stale entries (in state, no fs markers) get filtered here
-    // and then pruned from state by the post-sync step.
-    return stateToolKeys.filter(
-      (t) => configTools[t] && isInstalledOnFs(projectDir, t)
+    // verification (loaded per-tool from the adapter). Stale entries (in
+    // state, no fs markers) get filtered here and then pruned from state
+    // by the post-sync step.
+    const checked = await Promise.all(
+      stateToolKeys.map(async (t) => {
+        if (!configTools[t]) return null;
+        const adapter = await loadAdapterForFsCheck(t, config, toolkitRoot);
+        return isAdapterInstalledOnFs(projectDir, adapter) ? t : null;
+      })
     );
+    return checked.filter((t) => t !== null);
   }
 
-  // Fallback: fs-marker detection (recovery scenario).
+  // Fallback: fs-marker detection (recovery scenario). Iterate every
+  // configured tool — the marker set is read from each adapter's
+  // `fsMarkers` export, not a hardcoded map (OCP).
   const installed = [];
-  for (const tool of Object.keys(TOOL_FS_MARKERS)) {
-    if (!configTools[tool]) continue;
-    if (isInstalledOnFs(projectDir, tool)) {
+  for (const tool of Object.keys(configTools)) {
+    const adapter = await loadAdapterForFsCheck(tool, config, toolkitRoot);
+    if (isAdapterInstalledOnFs(projectDir, adapter)) {
       installed.push(tool);
     }
   }
@@ -118,7 +137,7 @@ export async function syncCommand({ flags, config, configPath, projectDir, toolk
     if (tools.length === 0) explicitEmpty = true;
   } else {
     // No --tools: auto-detect (state primary, fs fallback).
-    const installed = detectInstalledTools(projectDir, config.tools);
+    const installed = await detectInstalledTools(projectDir, config.tools, config, toolkitRoot);
     if (installed.length === 0) {
       console.log(`Nothing to sync in ${projectDir} (no toolkit files present).`);
       console.log(`Tip: run \`ai-toolkit init --tools=<...>\` to set up.`);
@@ -184,18 +203,23 @@ export async function syncCommand({ flags, config, configPath, projectDir, toolk
   // synced this run AND are no longer physically installed. We deliberately
   // leave entries for tools NOT in config.tools — sync doesn't know about
   // them and shouldn't delete state it doesn't own (could be a future
-  // adapter or third-party data). The fs-marker check is critical: a tool
-  // not synced this run may simply mean the user used selective --tools,
-  // not that the tool is gone — leaving the entry preserves the on-disk
-  // install (otherwise .claude/ files would become orphaned, invisible to
-  // future sync/list/doctor). Only runs when we actually synced at least
-  // one tool — the early-return "Nothing to sync" path leaves state untouched.
+  // adapter or third-party data). The fs-marker check (loaded per-tool from
+  // each adapter's `fsMarkers` export) is critical: a tool not synced this
+  // run may simply mean the user used selective --tools, not that the tool
+  // is gone — leaving the entry preserves the on-disk install. Only runs
+  // when we actually synced at least one tool — the early-return "Nothing
+  // to sync" path leaves state untouched.
   const state = readState(projectDir);
   const syncedKeys = new Set(tools);
   const configuredKeys = new Set(Object.keys(config.tools || {}));
   let pruned = false;
   for (const key of Object.keys(state.tools || {})) {
-    if (configuredKeys.has(key) && !syncedKeys.has(key) && !isInstalledOnFs(projectDir, key)) {
+    if (!configuredKeys.has(key) || syncedKeys.has(key)) continue;
+    // Lazy-load the adapter to read its fsMarkers. loadAdapterForFsCheck
+    // returns null if the adapter can't be loaded (e.g., file missing);
+    // in that case we treat the tool as "still has markers" (= preserve).
+    const adapter = await loadAdapterForFsCheck(key, config, toolkitRoot);
+    if (adapter && !isAdapterInstalledOnFs(projectDir, adapter)) {
       delete state.tools[key];
       pruned = true;
     }

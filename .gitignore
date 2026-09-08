@@ -35,5 +35,8 @@ logs/
 Thumbs.db
 /.context
 /.opencode
-/claude
+/.claude
+/.tasks
+/.plans
 AGENTS.md
+CLAUDE.md

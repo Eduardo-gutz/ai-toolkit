@@ -81,7 +81,7 @@ Each target has its **own independent state file**. They don't interfere with ea
 ## 🧪 Test
 
 ```bash
-npm test                                    # 260 tests, all passing
+npm test                                    # 291 tests, all passing
 node --test $(find tests -name '*.test.mjs')  # Same, explicit
 ```
 

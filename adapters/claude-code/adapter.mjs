@@ -1,12 +1,15 @@
-import { mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, rm, unlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { listAgents } from '../_shared/agents-walker.mjs';
-import { listSkills, readSkill, listSkillFiles } from '../_shared/skills-walker.mjs';
-import { listMcps, readMcp } from '../_shared/canonical-mcp.mjs';
+import { listSkills, listSkillFiles } from '../_shared/skills-walker.mjs';
+import { listMcps } from '../_shared/canonical-mcp.mjs';
 import { canonicalToClaudeCode } from '../_shared/mcp-transform.mjs';
 import { listRules, renderRules, renderClaudeMdImport } from '../_shared/rules-renderer.mjs';
 import { installResource } from '../_shared/install.mjs';
+import { removeIfEmpty, removeJsonKeys } from '../_shared/cleanup-if-empty.mjs';
+import { assertSafeName } from '../_shared/safe-name.mjs';
+import { makeResourcePaths, makeCleanupDirs } from '../_shared/tool-paths.mjs';
 import {
   readState,
   writeState,
@@ -29,8 +32,19 @@ import {
 const CLAUDE_AGENTS_DIR = '.claude/agents';
 const CLAUDE_SKILLS_DIR = '.claude/skills';
 const CLAUDE_MCP_FILE = '.mcp.json';
+const CLAUDE_ROOT = '.claude';
 const AGENTS_MD = 'AGENTS.md';
 const CLAUDE_MD = 'CLAUDE.md';
+
+/**
+ * Filesystem markers used by `sync`'s auto-detect fallback. If any of these
+ * paths exist in the project directory, the tool is considered physically
+ * installed. Read by sync.mjs via the loaded adapter module. Defining
+ * markers HERE (not in the command) keeps the OCP contract: adding a new
+ * tool only requires creating its adapter with its own `fsMarkers` —
+ * sync.mjs does not need to change.
+ */
+export const fsMarkers = [CLAUDE_AGENTS_DIR, CLAUDE_SKILLS_DIR, CLAUDE_MD, CLAUDE_MCP_FILE];
 
 /**
  * Install resources from source to target project for Claude Code.
@@ -81,20 +95,50 @@ export async function remove({ target, config, types }) {
   }
 
   writeState(target, state);
+
+  await postRemoveCleanup(target);
 }
 
 /**
- * Validate canonical source against claude-code adapter requirements.
- * @param {{source: string, config: object}} args
+ * Best-effort cleanup of the structure install() created.
+ * Each step is a no-op if the path doesn't exist or isn't empty.
  */
+async function postRemoveCleanup(target) {
+  await removeIfEmpty(`${target}/.claude/agents`);
+  await removeIfEmpty(`${target}/.claude/skills`);
+  await removeIfEmpty(`${target}/.claude`);
+
+  const agentsMd = `${target}/AGENTS.md`;
+  if (existsSync(agentsMd)) {
+    await unlink(agentsMd);
+  }
+
+  const claudeMd = `${target}/CLAUDE.md`;
+  if (existsSync(claudeMd)) {
+    await unlink(claudeMd);
+  }
+
+  await removeJsonKeys(`${target}/.mcp.json`, 'mcpServers');
+}
+
+/** Smoke test: ensure no broken resources. */
 export async function validate({ source, config }) {
-  // Smoke test: ensure no broken resources.
   listAgents(source);
   listSkills(source);
   listMcps(source);
   listRules(source);
   return { ok: true };
 }
+
+// Thin wrapper over makeResourcePaths — see adapters/_shared/tool-paths.mjs.
+export const resourcePaths = makeResourcePaths({
+  agentsDir: CLAUDE_AGENTS_DIR,
+  skillsDir: CLAUDE_SKILLS_DIR,
+  assertSafeName,
+});
+
+// Thin wrapper over makeCleanupDirs — see adapters/_shared/tool-paths.mjs.
+export const cleanupDirs = makeCleanupDirs({ rootDir: CLAUDE_ROOT });
 
 // ─── Internal helpers ─────────────────────────────────────────────────
 

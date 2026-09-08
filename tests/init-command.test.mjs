@@ -804,3 +804,63 @@ test('init: does NOT throw when at least one adapter succeeds (partial failure)'
     }
   });
 });
+
+// ─── SECURITY: init uses loadAdapter (Refactor B) ─────────────
+//
+// Behavior: after migrating from manual path-resolution
+// (`resolve(toolkitRoot, 'adapters/${tool}/adapter.mjs')` + `existsSync` +
+// `import`) to `loadAdapter`, init must reject path-traversal payloads
+// consistently with sync. loadAdapter's whitelist check fires BEFORE any
+// path is constructed, so `import()` is never called with a malicious path.
+
+test('init: rejects --tools=path-traversal (loadAdapter whitelist check)', async () => {
+  // Mirrors tests/sync-command.test.mjs:204-246 for init. After refactor B,
+  // both commands go through loadAdapter, so the same payload gets the same
+  // rejection (whitelist before path construction).
+  await withTempDir('aitk-init-', (projectDir) => {
+    const config = makeValidConfig();
+    return initCommand({
+      flags: { tools: '../../tmp/evil' },
+      config,
+      configPath: '/tmp/x.json',
+      projectDir,
+      toolkitRoot: '/nonexistent',
+    }).then(
+      () => { throw new Error('should have thrown'); },
+      (err) => {
+        // Error message comes from N6 (none-of-the-requested-tools path)
+        // which the explicit --tools triggers after loadAdapter rejects.
+        assert.match(err.message, /evil/i);
+        assert.match(
+          err.message,
+          /None of the requested tools|not configured/,
+          'init throws N6 after loadAdapter rejects the path-traversal tool'
+        );
+      }
+    );
+  });
+});
+
+test('init: rejects --tools=mixed valid+path-traversal (loadAdapter whitelist)', async () => {
+  // --tools=opencode,../../tmp/evil: opencode should be installed; evil should
+  // be rejected by loadAdapter. Same behavior as sync's mixed-payload test.
+  await withTempDir('aitk-init-', (projectDir) => {
+    const fakeRoot = join(projectDir, 'fake-toolkit');
+    mkdirSync(join(fakeRoot, 'adapters/opencode'), { recursive: true });
+    writeFileSync(
+      join(fakeRoot, 'adapters/opencode/adapter.mjs'),
+      'export async function install() {}'
+    );
+    const config = makeValidConfig();
+    config.default_tools = ['opencode'];
+    return initCommand({
+      flags: { tools: 'opencode,../../tmp/evil' },
+      config,
+      configPath: '/tmp/x.json',
+      projectDir,
+      toolkitRoot: fakeRoot,
+    });
+    // opencode installed (no-op success), evil rejected by loadAdapter (warn+skip).
+    // No throw because at least one succeeded.
+  });
+});

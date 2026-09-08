@@ -3,6 +3,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseToolsFlag } from '../lib/parse-tools-flag.mjs';
 import { parseTypesFlag } from '../lib/parse-types-flag.mjs';
+import { loadAdapter } from '../../adapters/_shared/load-adapter.mjs';
 
 export const ALL_TYPES = Object.freeze(['agents', 'skills', 'mcps', 'rules', 'commands']);
 
@@ -67,15 +68,17 @@ export async function initCommand({ flags, config, configPath, projectDir, toolk
       console.warn(`Tool "${tool}" not configured properly. Skipping.`);
       continue;
     }
-    const adapterPath = resolve(toolkitRoot, `adapters/${tool}/adapter.mjs`);
-    if (!existsSync(adapterPath)) {
-      console.warn(`Adapter not found for "${tool}" at ${adapterPath}. Skipping.`);
+
+    let adapter;
+    try {
+      adapter = await loadAdapter(tool, config, toolkitRoot);
+    } catch (err) {
+      console.warn(`Adapter not loaded for "${tool}": ${err.message}. Skipping.`);
       continue;
     }
 
     console.log(`Installing for ${tool}...`);
     try {
-      const adapter = await import(adapterPath);
       await adapter.install({
         source: resolve(toolkitRoot, config.source || './source'),
         target: projectDir,

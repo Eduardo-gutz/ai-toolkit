@@ -974,7 +974,7 @@ test('sync: --types=invalid throws "must be comma-separated"', async () => {
 test('sync: throws "All tools failed" when all adapters throw', async () => {
   // Set up a temp toolkit with an adapter that always throws.
   // Use --tools=broken explicitly to bypass filesystem detection (broken
-  // isn't in TOOL_FS_MARKERS, so auto-detect would skip it).
+  // adapter has no fsMarkers export, so auto-detect would skip it).
   const dir = await mkdtemp(join(tmpdir(), 'aitk-sync-f5-'));
   const fakeRoot = join(dir, 'fake-toolkit');
   try {
@@ -1007,10 +1007,11 @@ test('sync: partial failure (1 ok, 1 fail) does NOT throw', async () => {
   // fakeRoot nested under projectDir to avoid Node test runner issues
   // with separate top-level tempdirs (see init-command tests).
   //
-  // Use --tools=working,broken explicitly: working/broken are NOT in
-  // TOOL_FS_MARKERS, so auto-detect (no --tools) would skip them both and
-  // sync would early-return "Nothing to sync" — the partial-failure path
-  // would never run. With explicit --tools, both adapters actually execute.
+  // Use --tools=working,broken explicitly: working/broken adapters don't
+  // export fsMarkers, so auto-detect (no --tools) would treat them as
+  // "not installed" and sync would early-return "Nothing to sync" — the
+  // partial-failure path would never run. With explicit --tools, both
+  // adapters actually execute.
   const dir = await mkdtemp(join(tmpdir(), 'aitk-sync-partial-'));
   const fakeRoot = join(dir, 'fake-toolkit');
   const logsErr = [];
@@ -1041,6 +1042,100 @@ test('sync: partial failure (1 ok, 1 fail) does NOT throw', async () => {
     assert.match(allErrLogs, /broken.*boom/, 'broken adapter error must be logged via console.error');
   } finally {
     console.error = originalErr;
+    await rm(dir, { recursive: true });
+  }
+});
+
+// ─── fsMarkers come from adapter (Refactor A — OCP) ──────────
+//
+// Behavior: after moving fsMarkers out of sync.mjs's hardcoded
+// TOOL_FS_MARKERS map and into each adapter (export const fsMarkers),
+// sync must consult adapter.fsMarkers instead of an internal map. This
+// keeps OCP: adding a new tool only requires creating its adapter with
+// its own fsMarkers — sync.mjs does not need to change.
+
+test('sync: detects tool via adapter.fsMarkers export (discriminator for OCP move)', async () => {
+  // Discriminator: a tool not in TOOL_FS_MARKERS but whose adapter exports
+  // a custom fsMarkers MUST be detected as installed when its marker file
+  // is present on disk. Old code: TOOL_FS_MARKERS has only opencode/claude-code,
+  // so this tool is skipped by fs-fallback and never synced. New code:
+  // sync iterates config.tools, loads adapter, reads adapter.fsMarkers →
+  // marker exists → tool is installed → sync runs.
+  const dir = await mkdtemp(join(tmpdir(), 'aitk-sync-fsmarkers-'));
+  const fakeRoot = join(dir, 'fake-toolkit');
+  try {
+    await mkdir(join(fakeRoot, 'adapters/customtool'), { recursive: true });
+    await writeFile(
+      join(fakeRoot, 'adapters/customtool/adapter.mjs'),
+      `import { writeFile } from 'node:fs/promises';
+       import { join } from 'node:path';
+       export const fsMarkers = ['custom-marker-file'];
+       export async function sync({ target }) {
+         await writeFile(join(target, 'custom-marker-synced'), 'yes');
+       }`
+    );
+    // Create the marker file in the project directory.
+    await writeFile(join(dir, 'custom-marker-file'), 'present');
+    process.chdir(TOOLKIT);
+    const { syncCommand } = await import(SYNC_CMD);
+    const config = {
+      source: './source',
+      tools: { customtool: {} },
+      default_tools: ['customtool'],
+    };
+    // Auto-detect (no --tools): state empty → fs fallback → iterate
+    // config.tools → loadAdapter('customtool') → fsMarkers matches → installed.
+    await syncCommand({
+      flags: {},
+      config,
+      configPath: '/x.json',
+      projectDir: dir,
+      toolkitRoot: fakeRoot,
+    });
+    // Discriminator: the side-effect file exists ONLY if the new code worked.
+    assert.ok(
+      existsSync(join(dir, 'custom-marker-synced')),
+      'custom adapter ran (proves fsMarkers came from the adapter, not a hardcoded map)'
+    );
+  } finally {
+    await rm(dir, { recursive: true });
+  }
+});
+
+test('sync: adapter without fsMarkers export does not crash and is filtered as not-installed', async () => {
+  // Regression for refactor A: after moving fsMarkers from sync.mjs to each
+  // adapter, sync must gracefully handle adapters that don't export fsMarkers.
+  // Behavior: adapter.fsMarkers || [] → [] → "no markers" → filtered out
+  // (no install, no throw, no files written).
+  const dir = await mkdtemp(join(tmpdir(), 'aitk-sync-nofsmarkers-'));
+  const fakeRoot = join(dir, 'fake-toolkit');
+  try {
+    await mkdir(join(fakeRoot, 'adapters/nomarkers'), { recursive: true });
+    await writeFile(
+      join(fakeRoot, 'adapters/nomarkers/adapter.mjs'),
+      `export async function sync() {}`  // No fsMarkers export — sync must NOT crash on this.
+    );
+    process.chdir(TOOLKIT);
+    const { syncCommand } = await import(SYNC_CMD);
+    const config = {
+      source: './source',
+      tools: { nomarkers: {} },
+      default_tools: ['nomarkers'],
+    };
+    // Auto-detect: state empty, fs has no markers, config.tools has nomarkers.
+    // Old code: TOOL_FS_MARKERS['nomarkers'] undefined → not in fs scan → "Nothing to sync".
+    // New code: loadAdapter → adapter.fsMarkers undefined → [] → not installed.
+    // Both paths must converge on "no install, no throw".
+    await syncCommand({
+      flags: {},
+      config,
+      configPath: '/x.json',
+      projectDir: dir,
+      toolkitRoot: fakeRoot,
+    });
+    // No fs writes for the unknown tool (it was treated as not installed).
+    assert.ok(!existsSync(join(dir, '.nomarkers')), 'no .nomarkers/ created');
+  } finally {
     await rm(dir, { recursive: true });
   }
 });

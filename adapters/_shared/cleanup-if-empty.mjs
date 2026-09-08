@@ -58,3 +58,31 @@ export async function removeJsonKeys(filePath, keys) {
     return false;
   }
 }
+
+/**
+ * Read a JSON config file and return the parsed object, falling back to a
+ * caller-supplied default when the file is missing, corrupted, or doesn't
+ * have the expected shape (must be a non-null, non-array object).
+ *
+ * Used to safely merge MCP entries into user-edited config files
+ * (.mcp.json, opencode.json) — a corrupt file shouldn't crash install/remove.
+ *
+ * @param {string} path
+ * @param {object} [fallback={}] - returned when file is missing/invalid
+ * @returns {Promise<object>}
+ */
+export async function readJsonConfig(path, fallback = {}) {
+  if (!existsSync(path)) return fallback;
+  try {
+    const raw = await readFile(path, 'utf8');
+    const parsed = JSON.parse(raw);
+    // typeof guard (M14): reject null, arrays, primitives — callers expect
+    // an object shape (e.g., cfg.mcpServers is undefined, not TypeError).
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return fallback;
+    }
+    return parsed;
+  } catch {
+    return fallback;
+  }
+}

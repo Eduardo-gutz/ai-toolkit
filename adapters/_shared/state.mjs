@@ -45,7 +45,37 @@ export function createDefaultState() {
     installed_at: null,
     last_sync_at: null,
     tools: {},
+    agents_md_owners: [],
   };
+}
+
+/**
+ * Record that this tool wrote AGENTS.md (or owns it). Used by postRemoveCleanup
+ * to decide whether the file can be safely deleted on remove — only the LAST
+ * tool with rules registered may delete it. Idempotent.
+ * @param {object} state
+ * @param {string} toolName
+ */
+export function recordRulesOwnership(state, toolName) {
+  if (!state.agents_md_owners) {
+    // Legacy fallback: state from before ownership tracking existed.
+    state.agents_md_owners = [];
+  }
+  if (!state.agents_md_owners.includes(toolName)) {
+    state.agents_md_owners.push(toolName);
+  }
+}
+
+/**
+ * Release ownership of AGENTS.md for a tool. Called by postRemoveCleanup when
+ * a tool has just removed its rules — leaves the file intact if other tools
+ * still own it. No-op on legacy state (nothing to release).
+ * @param {object} state
+ * @param {string} toolName
+ */
+export function releaseRulesOwnership(state, toolName) {
+  if (!state.agents_md_owners) return;
+  state.agents_md_owners = state.agents_md_owners.filter((t) => t !== toolName);
 }
 
 /**

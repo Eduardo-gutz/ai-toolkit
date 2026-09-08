@@ -7,7 +7,7 @@ import { listMcps } from '../_shared/canonical-mcp.mjs';
 import { canonicalToOpencode } from '../_shared/mcp-transform.mjs';
 import { listRules, renderRules } from '../_shared/rules-renderer.mjs';
 import { installResource } from '../_shared/install.mjs';
-import { removeIfEmpty, removeJsonKeys } from '../_shared/cleanup-if-empty.mjs';
+import { removeIfEmpty, removeJsonKeys, readJsonConfig } from '../_shared/cleanup-if-empty.mjs';
 import { assertSafeName } from '../_shared/safe-name.mjs';
 import { makeResourcePaths, makeCleanupDirs } from '../_shared/tool-paths.mjs';
 import {
@@ -16,6 +16,9 @@ import {
   recordInstalled,
   recordSync,
   recordRemoved,
+  recordRulesOwnership,
+  releaseRulesOwnership,
+  pruneEmpty,
 } from '../_shared/state.mjs';
 
 /**
@@ -35,6 +38,8 @@ const OPENCODE_AGENTS_DIR = '.opencode/agents';
 const OPENCODE_SKILLS_DIR = '.opencode/skills';
 const OPENCODE_CONFIG = 'opencode.json';
 const OPENCODE_ROOT = '.opencode';
+const OPENCODE_MCP_KEY = 'mcp';
+const OPENCODE_SKILL_FILE = 'SKILL.md';
 const AGENTS_MD = 'AGENTS.md';
 
 /**
@@ -52,7 +57,11 @@ export const fsMarkers = [OPENCODE_AGENTS_DIR, OPENCODE_SKILLS_DIR, OPENCODE_CON
  * @param {{source: string, target: string, config: object, types: string[]}} args
  *   types: subset of ['agents', 'skills', 'mcps', 'rules', 'commands'].
  *          Empty/missing = install all four supported types.
- *          'commands' is silently ignored here (no walker yet).
+ *          'commands' is accepted by ALL_TYPES but the walker is not yet
+ *          implemented (deferred per WHY.md §8 Fase 3); entries are
+ *          silently ignored here.
+ * @returns {Promise<object>} the state object (post-write). Callers that
+ *   ignored the previous return value remain compatible.
  */
 export async function install({ source, target, config, types }) {
   const state = readState(target);
@@ -62,19 +71,23 @@ export async function install({ source, target, config, types }) {
   if (want('skills')) await installSkills(source, target, state);
   if (want('mcps'))   await installMcps(source, target, state, config);
   if (want('rules'))  await installRules(source, target, state);
-  // types.includes('commands') → no-op (deferred)
 
   writeState(target, state);
+  return state;
 }
 
 /**
  * Sync = reinstall resources (idempotent). When `types` is provided,
  * only those types are reinstalled; otherwise all supported types.
+ *
+ * Sync always rewrites all resources. There is no mtime/etag check; this
+ * is intentional for parity with `install --force`. If you need to preserve
+ * manual edits in the target, do not run `sync` after manual changes.
+ *
  * @param {{source: string, target: string, config: object, types?: string[]}} args
  */
 export async function sync({ source, target, config, types }) {
-  await install({ source, target, config, types });
-  const state = readState(target);
+  const state = await install({ source, target, config, types });
   recordSync(state, 'opencode');
   writeState(target, state);
 }
@@ -82,42 +95,165 @@ export async function sync({ source, target, config, types }) {
 /**
  * Remove resources installed by ai-toolkit from the target project.
  * When `types` is provided, only resources of those types are removed.
- * @param {{target: string, config: object, types?: string[]}} args
+ *
+ * `source` is optional but REQUIRED when removing rules — without it the
+ * adapter can't re-render AGENTS.md to reflect the remaining rules.
+ *
+ * @param {{target: string, source?: string, config: object, types?: string[]}} args
  */
-export async function remove({ target, config, types }) {
-  const state = readState(target);
+export async function remove({ target, source, config, types }) {
+  let state;
+  try {
+    state = readState(target);
+  } catch (err) {
+    // State file exists but is unreadable — refuse to remove, since we
+    // can't tell which resources this tool actually owns.
+    console.warn(`[opencode] state unreadable: ${err.message}. Skipping remove.`);
+    return;
+  }
+
+  // Snapshot: did this adapter have mcps BEFORE remove? (state-based, NOT
+  // filtered by --types). postRemoveCleanup uses hadMcps to decide whether
+  // the `mcp` key in opencode.json should be cleaned up. Filtering by the
+  // types argument here would cause the `mcp` key to be deleted on a
+  // --types=[agents,skills] remove even though mcps are still in state.
+  // willRemoveRules/willRemoveMcps (filtered by --types) gate the
+  // releaseRulesOwnership call and AGENTS.md re-render logic, but are NOT
+  // used for filesystem deletion decisions.
+  const hadMcps = !!state.tools?.opencode?.mcps;
+  const willRemoveRules = !types || types.includes('rules');
+  const willRemoveMcps = !types || types.includes('mcps');
+
+  // Track whether this run re-rendered AGENTS.md — if so, postRemoveCleanup
+  // must NOT delete it (the tool just wrote content there).
+  let agentsMdRerendered = false;
 
   for (const [type, names] of Object.entries(state.tools?.opencode || {})) {
     if (types && !types.includes(type)) continue;
     for (const name of Object.keys(names)) {
-      await removeResource(target, type, name);
-      recordRemoved(state, 'opencode', type, name);
+      if (type === 'rules') {
+        // Rules are concatenated — re-render AGENTS.md without the deleted rule.
+        // If write fails, do NOT recordRemoved (state stays consistent with disk).
+        if (!source) {
+          console.warn(
+            `[opencode] cannot re-render AGENTS.md without source. ` +
+            `State will diverge from filesystem until next \`ai-toolkit sync\`.`
+          );
+          recordRemoved(state, 'opencode', type, name);
+          continue;
+        }
+        const remainingSourceRules = listRules(source).filter((r) => r.name !== name);
+        if (remainingSourceRules.length === 0) {
+          // No rules left in source — let postRemoveCleanup decide whether to
+          // delete AGENTS.md (based on ownership). Don't re-render a stub:
+          // if this adapter is the last owner, the file gets deleted; if not,
+          // another adapter's rules remain and AGENTS.md should reflect them.
+          recordRemoved(state, 'opencode', type, name);
+          continue;
+        }
+        const agentsBody = renderRules(remainingSourceRules, {
+          intro: `These rules are applied to **${state.installed_at || 'this project'}** by ai-toolkit. Source: \`source/rules/\`. Edit rules in the source repo, not here.`,
+        });
+        try {
+          await writeFile(join(target, AGENTS_MD), agentsBody);
+          agentsMdRerendered = true;
+          recordRemoved(state, 'opencode', type, name);
+        } catch (err) {
+          console.warn(
+            `[opencode] failed to re-render AGENTS.md while removing rule '${name}': ${err.message}. ` +
+            `Skipping recordRemoved to keep state consistent with disk.`
+          );
+        }
+      } else {
+        await removeResource(target, type, name);
+        recordRemoved(state, 'opencode', type, name);
+      }
     }
   }
 
+  // Release AGENTS.md ownership — only the LAST owner will delete the file.
+  // Skipped when --types excludes rules: releasing ownership for a type that
+  // wasn't removed would falsely empty agents_md_owners and let
+  // postRemoveCleanup delete AGENTS.md on a non-rules remove.
+  if (willRemoveRules) {
+    releaseRulesOwnership(state, 'opencode');
+  }
+
+  // Drop empty parent keys so postRemoveCleanup's ownership check sees a
+  // clean state. Without this, the legacy fallback sees this tool as "still
+  // registered" even when its own entries are gone.
+  pruneEmpty(state);
+
   writeState(target, state);
 
-  await postRemoveCleanup(target);
+  await postRemoveCleanup(target, state, 'opencode', {
+    hadMcps,
+    agentsMdRerendered,
+  });
 }
 
 /**
  * Best-effort cleanup of the structure install() created.
  * Each step is a no-op if the path doesn't exist or isn't empty.
+ * Respects state.agents_md_owners to avoid deleting AGENTS.md that another
+ * adapter still depends on.
+ *
+ * @param {string} target
+ * @param {object} state - current state (after recordRemoved loop)
+ * @param {string} toolName
+ * @param {object} [options]
+ * @param {boolean} [options.hadMcps] - did this adapter have mcps before
+ *   remove? (state-based, NOT filtered by --types) Used together with the
+ *   current state (post-loop) to decide if the `mcp` key in opencode.json
+ *   should be cleaned up — never touches files the user may have created.
+ * @param {boolean} [options.agentsMdRerendered] - did this run re-render
+ *   AGENTS.md while removing rules? If yes, AGENTS.md was just written by
+ *   this tool — keep it (don't delete).
  */
-async function postRemoveCleanup(target) {
+async function postRemoveCleanup(target, state, toolName, options = {}) {
   await removeIfEmpty(`${target}/.opencode/agents`);
   await removeIfEmpty(`${target}/.opencode/skills`);
   await removeIfEmpty(`${target}/.opencode`);
 
-  const agentsMd = `${target}/AGENTS.md`;
-  if (existsSync(agentsMd)) {
-    await unlink(agentsMd);
+  // Decide whether to delete AGENTS.md based on ownership.
+  //   - Legacy state (no agents_md_owners): only delete if no other tool is
+  //     registered in state.tools (conservative — we can't track ownership
+  //     accurately in legacy mode).
+  //   - New state: only delete if no owner remains after releaseRulesOwnership.
+  //   - Skip deletion entirely if we just re-rendered AGENTS.md in this run.
+  const shouldDeleteAgentsMd = !options.agentsMdRerendered && (
+    state.agents_md_owners === undefined
+      ? Object.keys(state.tools || {}).filter((t) => t !== toolName).length === 0
+      : state.agents_md_owners.length === 0
+  );
+
+  if (shouldDeleteAgentsMd) {
+    const agentsMd = `${target}/AGENTS.md`;
+    if (existsSync(agentsMd)) {
+      await unlink(agentsMd);
+    }
   }
 
-  await removeJsonKeys(`${target}/opencode.json`, 'mcp');
+  // MCP keys: only delete the JSON key if this adapter HAD mcps at some
+  // point (so the file's `mcp` key is something we installed, not user-
+  // created) AND state now has no mcps entries left (so the key is
+  // obsolete). If state still has mcps — e.g. on a --types=[agents,skills]
+  // remove — leave the file untouched; the surviving mcps need the key.
+  const stillHasMcps = !!state.tools?.opencode?.mcps;
+  if (options.hadMcps && !stillHasMcps) {
+    await removeJsonKeys(`${target}/${OPENCODE_CONFIG}`, OPENCODE_MCP_KEY);
+  }
 }
 
-/** Smoke test: ensure no broken resources. */
+/**
+ * Shallow smoke test: walks source/<type>/ and returns { ok: true } if
+ * none throw. Does NOT check semantic validity of resources, nor that
+ * target exists (validate runs BEFORE install). For deeper checks, use
+ * the `validate` CLI command.
+ * @returns {Promise<{ok: true}>}
+ */
+// validate runs BEFORE install — target doesn't exist yet. Walkers read
+// from source/ only.
 export async function validate({ source, config }) {
   listAgents(source);
   listSkills(source);
@@ -135,8 +271,6 @@ export const resourcePaths = makeResourcePaths({
 
 // Thin wrapper over makeCleanupDirs — see adapters/_shared/tool-paths.mjs.
 export const cleanupDirs = makeCleanupDirs({ rootDir: OPENCODE_ROOT });
-
-// ─── Internal helpers ─────────────────────────────────────────────────
 
 async function installAgents(source, target, state) {
   const agents = listAgents(source);
@@ -158,8 +292,8 @@ async function installSkills(source, target, state) {
     const dstDir = join(skillsBase, skill.name);
     await mkdir(dstDir, { recursive: true });
 
-    const dstMd = join(dstDir, 'SKILL.md');
-    await installResource(join(skill.dir, 'SKILL.md'), dstMd);
+    const dstMd = join(dstDir, OPENCODE_SKILL_FILE);
+    await installResource(join(skill.dir, OPENCODE_SKILL_FILE), dstMd);
 
     for (const file of listSkillFiles(skill.dir)) {
       const dstFile = join(dstDir, file.relative);
@@ -171,27 +305,25 @@ async function installSkills(source, target, state) {
   }
 }
 
+/**
+ * Install MCPs by merging canonical definitions into the user's opencode.json.
+ * @param {{}} config - reserved for future MCP runtime overrides; unused for now
+ */
 async function installMcps(source, target, state, config) {
   const mcps = listMcps(source);
   if (mcps.length === 0) return;
 
   const configPath = join(target, OPENCODE_CONFIG);
-  let existing = {};
-  if (existsSync(configPath)) {
-    try {
-      existing = JSON.parse(await readFile(configPath, 'utf8'));
-    } catch {
-      existing = {};
-    }
-  }
+  const existing = await readJsonConfig(configPath, {});
 
-  const mcpSection = existing.mcp || {};
+  const mcpSection = existing[OPENCODE_MCP_KEY] || {};
   for (const mcp of mcps) {
     mcpSection[mcp.name] = canonicalToOpencode(mcp.definition);
     recordInstalled(state, 'opencode', 'mcps', mcp.name);
   }
 
-  existing.mcp = mcpSection;
+  existing[OPENCODE_MCP_KEY] = mcpSection;
+  // 2-space indent: matches toolkit convention, produces stable git diffs.
   await writeFile(configPath, JSON.stringify(existing, null, 2) + '\n');
 }
 
@@ -214,9 +346,16 @@ async function installRules(source, target, state) {
       await writeFile(dst, `# Project Rules\n\nNo rules defined yet. Run \`ai-toolkit sync\` after adding rules to source/rules/.\n`);
     }
   }
+
+  // Both branches wrote AGENTS.md (or a stub) — claim ownership so
+  // postRemoveCleanup knows not to delete it if other tools still depend on it.
+  recordRulesOwnership(state, 'opencode');
 }
 
 async function removeResource(target, type, name) {
+  // Type 'rules' is intentionally absent — rules live in AGENTS.md (concatenated),
+  // and the caller (remove()) handles them inline by re-rendering AGENTS.md and
+  // never delegates to this helper. Adding a case here would mask the no-op.
   switch (type) {
     case 'agents': {
       const dst = join(target, OPENCODE_AGENTS_DIR, `${name}.md`);
@@ -230,18 +369,11 @@ async function removeResource(target, type, name) {
     }
     case 'mcps': {
       const configPath = join(target, OPENCODE_CONFIG);
-      if (existsSync(configPath)) {
-        const cfg = JSON.parse(await readFile(configPath, 'utf8'));
-        if (cfg.mcp?.[name]) {
-          delete cfg.mcp[name];
-          await writeFile(configPath, JSON.stringify(cfg, null, 2) + '\n');
-        }
+      const cfg = await readJsonConfig(configPath, {});
+      if (cfg[OPENCODE_MCP_KEY]?.[name]) {
+        delete cfg[OPENCODE_MCP_KEY][name];
+        await writeFile(configPath, JSON.stringify(cfg, null, 2) + '\n');
       }
-      break;
-    }
-    case 'rules': {
-      // Rules are concatenated — don't delete individual files.
-      // Instead, re-render without the deleted rule.
       break;
     }
   }

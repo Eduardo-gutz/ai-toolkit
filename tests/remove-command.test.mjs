@@ -500,9 +500,12 @@ test('remove --yes (Mode 1) deletes stub files (AGENTS.md, CLAUDE.md, mcp keys)'
     assert.equal(result.ok, true, `Should not throw. Got: ${result.error}`);
 
     const { existsSync } = await import('node:fs');
-    // Stub files: deleted
+    // Stub files: AGENTS.md is deleted (no other tool owns it after both removes).
     assert.ok(!existsSync(join(dir, 'AGENTS.md')), 'AGENTS.md should be removed by postRemoveCleanup');
-    assert.ok(!existsSync(join(dir, 'CLAUDE.md')), 'CLAUDE.md should be removed by postRemoveCleanup');
+    // CLAUDE.md is KEPT: per plan §1.4, CLAUDE.md only deletes if this adapter
+    // had no rules before remove. In this fixture claude-code had rules, so
+    // CLAUDE.md persists (it imports AGENTS.md; user can repair or delete).
+    assert.ok(existsSync(join(dir, 'CLAUDE.md')), 'CLAUDE.md kept (adapter had rules before remove — new ownership semantics per plan §1.4)');
     // mcp/mcpServers keys: deleted. If the JSON file becomes empty, the
     // file itself is deleted by removeJsonKeys.
     assert.ok(!existsSync(join(dir, 'opencode.json')), 'opencode.json should be deleted (empty after mcp key removal)');

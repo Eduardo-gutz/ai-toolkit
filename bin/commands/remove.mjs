@@ -155,12 +155,14 @@ async function removeByScope({ flags, config, projectDir, toolkitRoot, tools, ty
     // Type-scoped: delegate to each adapter's remove({ types }) — same code
     // path as Mode 1, just filtered. Errors are accumulated per tool
     // (mirror sync.mjs:148-173) and only throw when ALL fail.
+    // Pass config.source so adapter.remove() can re-render AGENTS.md when
+    // removing rules (required for state<->filesystem consistency).
     let installed = 0;
     const errors = [];
     for (const tool of tools) {
       try {
         const adapter = await loadAdapter(tool, config, toolkitRoot);
-        await adapter.remove({ target: projectDir, config, types });
+        await adapter.remove({ target: projectDir, source: config.source, config, types });
         console.log(`  ✓ ${tool}: ${types.join(', ')} removed`);
         installed++;
       } catch (err) {
@@ -175,10 +177,12 @@ async function removeByScope({ flags, config, projectDir, toolkitRoot, tools, ty
     // All: use each adapter's remove() via loadAdapter (whitelist enforced).
     // adapter.remove() calls postRemoveCleanup() internally to remove empty
     // dirs and stub files, so we don't drive adapter.cleanupDirs() from here.
+    // Pass config.source so adapter.remove() can re-render AGENTS.md when
+    // removing rules.
     for (const tool of tools) {
       try {
         const adapter = await loadAdapter(tool, config, toolkitRoot);
-        await adapter.remove({ target: projectDir, config });
+        await adapter.remove({ target: projectDir, source: config.source, config });
         console.log(`  ✓ ${tool}: removed`);
       } catch (err) {
         console.warn(`  ✗ ${tool}: ${err.message}`);

@@ -79,6 +79,250 @@ test('opencode: validate is a no-op smoke test', async () => {
   assert.equal(result.ok, true);
 });
 
+test('opencode: installRules records AGENTS.md ownership (with rules)', async () => {
+  const tmpDir = await mkTmp();
+  const adapter = await import('../../../adapters/opencode/adapter.mjs');
+  await adapter.install({ source: FIXTURES, target: tmpDir, config: {} });
+
+  const state = readState(tmpDir);
+  assert.ok(
+    state.agents_md_owners.includes('opencode'),
+    `state.agents_md_owners should include 'opencode', got: ${JSON.stringify(state.agents_md_owners)}`
+  );
+});
+
+test('opencode: installRules records AGENTS.md ownership (no rules branch)', async () => {
+  // Source with no rules directory → installRules hits the else branch,
+  // which still writes a stub AGENTS.md. Ownership must be recorded.
+  const tmpDir = await mkTmp();
+  const sourceDir = await mkTmp();
+  const adapter = await import('../../../adapters/opencode/adapter.mjs');
+  await adapter.install({ source: sourceDir, target: tmpDir, config: {} });
+
+  const state = readState(tmpDir);
+  assert.ok(
+    state.agents_md_owners.includes('opencode'),
+    'should own AGENTS.md even when no rules are installed'
+  );
+});
+
+test('opencode: remove — empty state, no crash', async () => {
+  // Fresh project with state already clean — remove should be a graceful no-op.
+  const tmpDir = await mkTmp();
+  const adapter = await import('../../../adapters/opencode/adapter.mjs');
+  await assert.doesNotReject(
+    adapter.remove({ target: tmpDir, config: {} })
+  );
+});
+
+test('opencode: remove — single tool cleans AGENTS.md', async () => {
+  // Install with rules, then remove everything. With only this tool as owner,
+  // AGENTS.md should be deleted (opencode has no CLAUDE.md).
+  const tmpDir = await mkTmp();
+  const adapter = await import('../../../adapters/opencode/adapter.mjs');
+  await adapter.install({ source: FIXTURES, target: tmpDir, config: {} });
+
+  assert.ok(await fileExists(join(tmpDir, 'AGENTS.md')), 'pre: AGENTS.md exists');
+
+  await adapter.remove({ target: tmpDir, config: {} });
+
+  assert.equal(await fileExists(join(tmpDir, 'AGENTS.md')), false, 'AGENTS.md deleted');
+});
+
+test('opencode: remove — cross-tool AGENTS.md persists', async () => {
+  // Install both adapters with rules. Remove only claude-code. AGENTS.md must
+  // persist because opencode still owns it.
+  const tmpDir = await mkTmp();
+  const claude = await import('../../../adapters/claude-code/adapter.mjs');
+  const opencode = await import('../../../adapters/opencode/adapter.mjs');
+
+  await claude.install({ source: FIXTURES, target: tmpDir, config: {} });
+  await opencode.install({ source: FIXTURES, target: tmpDir, config: {} });
+
+  assert.ok(await fileExists(join(tmpDir, 'AGENTS.md')), 'pre: AGENTS.md exists');
+
+  await claude.remove({ target: tmpDir, config: {} });
+
+  // AGENTS.md should STILL exist — opencode still owns it.
+  assert.ok(
+    await fileExists(join(tmpDir, 'AGENTS.md')),
+    'AGENTS.md persists when other tool still owns it'
+  );
+});
+
+test('opencode: remove — legacy state, no other tools, deletes AGENTS.md', async () => {
+  const tmpDir = await mkTmp();
+  const adapter = await import('../../../adapters/opencode/adapter.mjs');
+  await adapter.install({ source: FIXTURES, target: tmpDir, config: {} });
+
+  const { writeState } = await import('../../../adapters/_shared/state.mjs');
+  const state = readState(tmpDir);
+  delete state.agents_md_owners;
+  writeState(tmpDir, state);
+
+  await adapter.remove({ target: tmpDir, config: {} });
+
+  assert.equal(
+    await fileExists(join(tmpDir, 'AGENTS.md')),
+    false,
+    'AGENTS.md deleted in legacy fallback when only this tool is registered'
+  );
+});
+
+test('opencode: remove — legacy state, other tools registered, AGENTS.md persists', async () => {
+  const tmpDir = await mkTmp();
+  const adapter = await import('../../../adapters/opencode/adapter.mjs');
+  await adapter.install({ source: FIXTURES, target: tmpDir, config: {} });
+
+  const { writeState } = await import('../../../adapters/_shared/state.mjs');
+  const state = readState(tmpDir);
+  delete state.agents_md_owners;
+  state.tools['claude-code'] = { rules: { 'test-rule': { installed_at: new Date().toISOString() } } };
+  writeState(tmpDir, state);
+
+  await adapter.remove({ target: tmpDir, config: {} });
+
+  assert.ok(
+    await fileExists(join(tmpDir, 'AGENTS.md')),
+    'AGENTS.md persists in legacy fallback when other tools are registered'
+  );
+});
+
+test('opencode: remove — corrupted state file, logs warning, does not throw', async () => {
+  const tmpDir = await mkTmp();
+  const { writeFile } = await import('node:fs/promises');
+  await writeFile(join(tmpDir, '.ai-toolkit.json'), '{ this is not json');
+
+  const adapter = await import('../../../adapters/opencode/adapter.mjs');
+  await assert.doesNotReject(
+    adapter.remove({ target: tmpDir, config: {} })
+  );
+});
+
+test('opencode: remove rules re-renders AGENTS.md without deleted rule (T4)', async () => {
+  // Install with rules X and Y. Trim state to ONLY 'test-rule-two.md'.
+  // remove({types:['rules']}) re-renders AGENTS.md with remaining source rules.
+  const tmpDir = await mkTmp();
+  const adapter = await import('../../../adapters/opencode/adapter.mjs');
+  await adapter.install({ source: FIXTURES, target: tmpDir, config: {} });
+
+  const state = readState(tmpDir);
+  delete state.tools.opencode.rules['test-rule.md'];
+  const { writeState } = await import('../../../adapters/_shared/state.mjs');
+  writeState(tmpDir, state);
+
+  await adapter.remove({
+    target: tmpDir,
+    source: FIXTURES,
+    config: {},
+    types: ['rules'],
+  });
+
+  const after = await readFile(join(tmpDir, 'AGENTS.md'));
+  assert.ok(
+    !after.includes('Test Rule Two'),
+    'AGENTS.md no longer contains the deleted rule (test-rule-two)'
+  );
+  assert.ok(after.includes('Test Rule\n'), 'AGENTS.md re-rendered with the remaining source rule');
+});
+
+test('opencode: remove with --types=[agents,skills] preserves rules + mcps state AND filesystem', async () => {
+  // Regression mirror of the claude-code T-filter test: --types=[agents,skills]
+  // must NOT touch mcps/rules. Setup: install full source. Remove only
+  // agents + skills. Expectations:
+  //   - state: agents/skills pruned, mcps + rules preserved
+  //   - AGENTS.md still exists (rules were not removed)
+  //   - opencode.json.mcp['test-mcp'] still exists (mcps were not removed)
+  const tmpDir = await mkTmp();
+  const adapter = await import('../../../adapters/opencode/adapter.mjs');
+  await adapter.install({ source: FIXTURES, target: tmpDir, config: {} });
+
+  // Pre-conditions on filesystem.
+  assert.ok(await fileExists(join(tmpDir, 'AGENTS.md')), 'pre: AGENTS.md exists');
+  const opencodeBefore = JSON.parse(await readFile(join(tmpDir, 'opencode.json')));
+  assert.ok(
+    opencodeBefore.mcp?.['test-mcp'],
+    'pre: opencode.json contains mcp.test-mcp'
+  );
+
+  // Act: scoped remove (only agents + skills).
+  await adapter.remove({
+    target: tmpDir,
+    source: FIXTURES,
+    config: {},
+    types: ['agents', 'skills'],
+  });
+
+  // State assertions: agents/skills pruned, mcps + rules preserved.
+  const state = readState(tmpDir);
+  assert.equal(
+    state.tools?.opencode?.agents,
+    undefined,
+    'state.agents pruned after remove'
+  );
+  assert.equal(
+    state.tools?.opencode?.skills,
+    undefined,
+    'state.skills pruned after remove'
+  );
+  assert.ok(
+    state.tools?.opencode?.mcps?.['test-mcp'],
+    'state.mcps preserved (not in --types)'
+  );
+  assert.ok(
+    state.tools?.opencode?.rules?.['test-rule.md'],
+    'state.rules.test-rule.md preserved (not in --types)'
+  );
+  assert.ok(
+    state.tools?.opencode?.rules?.['test-rule-two.md'],
+    'state.rules.test-rule-two.md preserved (not in --types)'
+  );
+
+  // ── Filesystem regression assertions ───────────────────────────────────
+  // AGENTS.md MUST persist because rules were NOT removed.
+  assert.ok(
+    await fileExists(join(tmpDir, 'AGENTS.md')),
+    'AGENTS.md preserved when --types excludes rules'
+  );
+  // opencode.json's `mcp` key MUST persist because mcps were NOT removed.
+  // hadMcps is state-based; postRemoveCleanup now also checks state so the
+  // key is left untouched when mcps survive.
+  const opencodeAfter = JSON.parse(await readFile(join(tmpDir, 'opencode.json')));
+  assert.ok(
+    opencodeAfter.mcp?.['test-mcp'],
+    'opencode.json mcp key preserved when --types excludes mcps'
+  );
+});
+
+test('opencode: remove with corrupted opencode.json does not throw (T10)', async () => {
+  // User-edited opencode.json that became invalid JSON — removeResource for
+  // mcps must not crash; readJsonConfig should fall back to {}.
+  const tmpDir = await mkTmp();
+  const { writeFile } = await import('node:fs/promises');
+  await writeFile(join(tmpDir, 'opencode.json'), '{ this is not valid json');
+
+  const { writeState } = await import('../../../adapters/_shared/state.mjs');
+  const state = {
+    version: '1.0.0',
+    installed_at: null,
+    last_sync_at: null,
+    tools: {},
+    agents_md_owners: [],
+  };
+  state.tools.opencode = {
+    agents: {},
+    skills: {},
+    mcps: { 'test-mcp': { installed_at: '2026-01-01' } },
+    rules: {},
+  };
+  writeState(tmpDir, state);
+
+  const adapter = await import('../../../adapters/opencode/adapter.mjs');
+  await assert.doesNotReject(
+    adapter.remove({ target: tmpDir, config: {}, types: ['mcps'] })
+  );
+});
+
 // ─── helpers ────────────────────────────────────────────────────────────
 
 import { mkdtemp, readFile as _readFile, lstat, rm } from 'node:fs/promises';

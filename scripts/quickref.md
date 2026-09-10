@@ -36,10 +36,10 @@ node /path/to/ai-toolkit/bin/ai-toolkit.mjs init \
 ├── AGENTS.md              # Rules (concatenated, both tools)
 ├── CLAUDE.md              # Claude Code only — imports AGENTS.md
 ├── .opencode/
-│   └── agents/            # Symlinks to source/agents/*.md
+│   └── agents/            # Copies of source/agents/*.md
 └── .claude/
-    ├── agents/            # Symlinks to source/agents/*.md (named same)
-    └── skills/            # Symlinks to source/skills/*/SKILL.md
+    ├── agents/            # Copies of source/agents/*.md (named same)
+    └── skills/            # Copies of source/skills/*/SKILL.md
 ```
 
 > **All files are copies** → changes in the toolkit source require `sync` to be picked up (no live change detection; trade-off for stability across npx cache cleans).
@@ -61,7 +61,6 @@ node /path/to/ai-toolkit/bin/ai-toolkit.mjs init \
 | `--project=<path>` | Target project directory (default: cwd) |
 | `--global` | Shorthand for `--project=$HOME/.ai-toolkit` (user-level) |
 | `--config=<path>` | Path to `ai-toolkit.config.json` (default: toolkit's own) |
-| `--profile=<name>` | Use a specific profile from config |
 | `--yes` | Skip interactive prompts (CI mode) |
 | `--help` | Show help |
 | `--version` | Show version |
@@ -81,7 +80,7 @@ Each target has its **own independent state file**. They don't interfere with ea
 ## 🧪 Test
 
 ```bash
-npm test                                    # 291 tests, all passing
+npm test                                    # 330 tests, all passing
 node --test $(find tests -name '*.test.mjs')  # Same, explicit
 ```
 
@@ -120,12 +119,3 @@ This catches:
 
 Exit 0 = all OK; exit 1 = errors (listed in output).
 
-## ⚠️ Known issues with source
-
-Several source files have malformed YAML frontmatter and are **skipped with warnings** (not failed):
-
-- `source/agents/qa.md` (description has unquoted `:`)
-- `source/agents/task-builder.md`
-- `source/skills/{adb-qa,backend,frontend}.md` (descriptions have unquoted `:` and `()`)
-
-To fix, quote the `description:` value: `description: "..."` (or use `>` block scalar).

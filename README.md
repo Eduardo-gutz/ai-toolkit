@@ -62,6 +62,6 @@ ai-toolkit/
 
 **Next**: Phase 1.5 — interactive init fix (`select` → `checkbox`) + `CLAUDE.md` with `@AGENTS.md` import.
 
-Test status: **291/291 passing**.
+Test status: **330/330 passing**.
 
 See `.context/WHY.md` for the full design history and roadmap.

@@ -150,11 +150,6 @@ test('parseFlags: --config alone is still false', () => {
   assert.equal(r.flags.config, false);
 });
 
-test('parseFlags: --profile alone is still false', () => {
-  const r = parseFlags(['--profile']);
-  assert.equal(r.flags.profile, false);
-});
-
 test('parseFlags: mixed --yes (boolean) and --tools=opencode (value)', () => {
   const r = parseFlags(['--yes', '--tools=opencode']);
   assert.equal(r.flags.yes, true);

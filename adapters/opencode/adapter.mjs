@@ -56,10 +56,9 @@ export const fsMarkers = [OPENCODE_AGENTS_DIR, OPENCODE_SKILLS_DIR, OPENCODE_CON
  * Install resources from source to target project for opencode.
  * @param {{source: string, target: string, config: object, types: string[]}} args
  *   types: subset of ['agents', 'skills', 'mcps', 'rules', 'commands'].
- *          Empty/missing = install all four supported types.
- *          'commands' is accepted by ALL_TYPES but the walker is not yet
- *          implemented (deferred per WHY.md §8 Fase 3); entries are
- *          silently ignored here.
+ *          Empty/missing = install all five advertised types.
+ *          'commands' is accepted for forward-compat but is a no-op
+ *          (walker deferred per WHY.md §8 Fase 3).
  * @returns {Promise<object>} the state object (post-write). Callers that
  *   ignored the previous return value remain compatible.
  */

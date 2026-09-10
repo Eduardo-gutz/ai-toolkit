@@ -12,7 +12,10 @@ export const ALL_TYPES = Object.freeze(['agents', 'skills', 'mcps', 'rules', 'co
  *
  * Resolution:
  *   tools: --tools > config.default_tools
- *   types: --types > ALL_TYPES (default: agents, skills, mcps, rules, commands)
+ *   types: subset of ['agents', 'skills', 'mcps', 'rules', 'commands'].
+ *          Empty/missing = install all five advertised types.
+ *          'commands' is accepted for forward-compat but is a no-op
+ *          (walker deferred per WHY.md §8 Fase 3).
  *
  * Auto-creates projectDir if missing. Does NOT touch state directly —
  * adapters handle their own per-resource state writes.

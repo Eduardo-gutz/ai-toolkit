@@ -7,7 +7,11 @@ import { dirname, join } from 'node:path';
  * different filesystems. Trade-off: changes to source/ require `sync`
  * to propagate; no live change detection.
  *
- * If `dst` exists and `overwrite` is true (default), it is replaced.
+ * If `dst` exists and `overwrite` is true (default), it is replaced
+ * WITHOUT a backup. (The `backup_existing` config flag was retired —
+ * backup is out of scope per issue 3b; use git/manual copies if you
+ * need safety.)
+ *
  * Parent directories are created as needed.
  *
  * @param {string} src - absolute source path (file OR directory)

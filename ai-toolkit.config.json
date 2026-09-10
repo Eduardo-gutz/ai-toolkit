@@ -26,8 +26,6 @@
   "default_tools": ["opencode", "claude-code"],
 
   "install": {
-    "strategy": "symlink",
-    "backup_existing": true,
     "state_file": ".ai-toolkit.json"
   }
 }

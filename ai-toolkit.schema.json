@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "./ai-toolkit.schema.json",
+  "title": "ai-toolkit.config.json",
+  "description": "Configuration for the ai-toolkit installer. Documents the post-fix shape (no install.strategy — only copy is supported; no install.backup_existing — never implemented). Inline-validated by tests/schema-config.test.mjs (no ajv dependency).",
+  "type": "object",
+  "required": ["version", "source", "tools", "default_tools"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Config schema version."
+    },
+    "source": {
+      "type": "string",
+      "description": "Path to the canonical source tree (relative to toolkit root)."
+    },
+    "tools": {
+      "type": "object",
+      "description": "Per-tool configuration. Keys are tool names; values are toolConfig objects.",
+      "additionalProperties": false,
+      "properties": {
+        "opencode":     { "$ref": "#/$defs/toolConfig" },
+        "claude-code":  { "$ref": "#/$defs/toolConfig" }
+      }
+    },
+    "default_tools": {
+      "type": "array",
+      "description": "Tools targeted when --tools is omitted. Must be a subset of the supported tool set.",
+      "items": {
+        "type": "string",
+        "enum": ["opencode", "claude-code"]
+      }
+    },
+    "install": {
+      "type": "object",
+      "description": "Install-time options. Currently only state_file (where per-project state is recorded).",
+      "properties": {
+        "state_file": {
+          "type": "string",
+          "description": "Path (relative to project root) where per-project state is recorded."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "toolConfig": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled":         { "type": "boolean" },
+        "skills_target":   { "type": "string" },
+        "skills_strategy": { "type": "string" },
+        "rules_target":    { "type": "string" },
+        "agents_target":   { "type": "string" },
+        "commands_target": { "type": "string" },
+        "mcp_target":      { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

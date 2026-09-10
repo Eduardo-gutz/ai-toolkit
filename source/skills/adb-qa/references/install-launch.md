@@ -1,4 +1,4 @@
-# Install + Launch + Permisos
+# Install + Launch + Permissions
 
 ## Install
 
@@ -6,66 +6,66 @@
 adb -s <serial> install /path/to/zumapos.apk
 ```
 
-Flags útiles:
+Useful flags:
 
-| Flag | Significado |
+| Flag | Meaning |
 |---|---|
-| `-r` | Reemplaza instalación existente (preserva datos). **Casi siempre lo quieres.** |
-| `-d` | Permite downgrade de versión. Útil para volver a una build anterior durante debugging. |
-| `-t` | Permite test-only APKs (no recomendables en producción). |
-| `-g` | Otorga automáticamente todos los permisos runtime declarados. Útil para smoke; **no usar para validación de permisos**. |
-| `--abi` | Forzar ABI específico al instalar (multi-APK split). |
+| `-r` | Replaces existing installation (preserves data). **Almost always you want this.** |
+| `-d` | Allows version downgrade. Useful for going back to a previous build during debugging. |
+| `-t` | Allows test-only APKs (not recommended in production). |
+| `-g` | Automatically grants all declared runtime permissions. Useful for smoke; **do not use for permission validation**. |
+| `--abi` | Force a specific ABI on install (multi-APK split). |
 
-Ejemplo del flujo que vas a usar el 90% del tiempo:
+Example of the flow you will use 90% of the time:
 ```bash
 adb -s <serial> install -r build/output.apk
 ```
 
-Verificar que la instalación quedó con la versión correcta:
+Verify that the install ended up with the correct version:
 ```bash
 adb shell dumpsys package com.egsolutions.zumapos | grep -E "versionName|versionCode"
 ```
 
-## Limpiar datos sin desinstalar
+## Clear data without uninstalling
 
 ```bash
 adb -s <serial> shell pm clear com.egsolutions.zumapos
 ```
 
-Esto resetea el onboarding del usuario, productos, fiados, todo. Es el equivalente funcional de "desinstalar + instalar", pero más rápido y reversible sin reinstalar.
+This resets user onboarding, products, credit records, everything. It is the functional equivalent of "uninstall + install", but faster and reversible without reinstalling.
 
-**Cuándo usar:** reproducir bugs que dependen del estado inicial (fresh install).
-**Cuándo NO usar:** si necesitas validar flujos que dependen de datos previos del usuario.
+**When to use:** reproduce bugs that depend on the initial state (fresh install).
+**When NOT to use:** if you need to validate flows that depend on previous user data.
 
-## Desinstalar
+## Uninstall
 
 ```bash
 adb -s <serial> uninstall com.egsolutions.zumapos
 ```
 
-Solo si estás seguro. **Confirmar con el humano antes.** No hay vuelta atrás (los datos de la DB SQLite local se van).
+Only if you are sure. **Confirm with the human first.** There is no going back (local SQLite DB data is gone).
 
-`uninstall -k` mantiene `data/` y `cache/` después de uninstall — útil para casos extremos de forensics.
+`uninstall -k` keeps `data/` and `cache/` after uninstall — useful for extreme forensics cases.
 
-## Lanzar la app
+## Launch the app
 
-Tres formas, en orden de recomendación:
+Three ways, in order of recommendation:
 
-### 1. `monkey` (la más simple, suficiente en el 99% de casos)
+### 1. `monkey` (simplest, sufficient in 99% of cases)
 
 ```bash
 adb -s <serial> shell monkey -p com.egsolutions.zumapos -c android.intent.category.LAUNCHER 1
 ```
 
-`1` al final = un solo evento. Útil para no spammear. `monkey` resuelve el launcher por su cuenta; no necesitas saber el nombre de la activity.
+`1` at the end = a single event. Useful to not spam. `monkey` resolves the launcher on its own; you do not need to know the activity name.
 
-### 2. `am start` con la activity explícita
+### 2. `am start` with the explicit activity
 
 ```bash
 adb -s <serial> shell am start -n com.egsolutions.zumapos/.MainActivity
 ```
 
-Ventaja: el flag `-W` espera a que la activity esté rendered y reporta tiempos:
+Advantage: the `-W` flag waits for the activity to be rendered and reports timings:
 ```bash
 adb shell am start -W -n com.egsolutions.zumapos/.MainActivity
 # Status: ok
@@ -75,7 +75,7 @@ adb shell am start -W -n com.egsolutions.zumapos/.MainActivity
 # WaitTime: 567
 ```
 
-`-S` (stop) fuerza un cold start garantizado.
+`-S` (stop) forces a guaranteed cold start.
 
 ### 3. Deep links
 
@@ -83,49 +83,49 @@ adb shell am start -W -n com.egsolutions.zumapos/.MainActivity
 adb -s <serial> shell am start -a android.intent.action.VIEW -d "zumapos://sales/42"
 ```
 
-El scheme está declarado en `app.json:8` como `zumapos`. Verifica con:
+The scheme is declared in `app.json:8` as `zumapos`. Verify with:
 ```bash
 adb shell pm dump com.egsolutions.zumapos | grep -A2 "scheme"
 ```
 
-Si no tienes certeza del scheme, query al manifest:
+If you are not sure of the scheme, query the manifest:
 ```bash
 adb shell dumpsys package com.egsolutions.zumapos | grep -A20 "Activity Resolver"
 ```
 
-## Detener la app
+## Stop the app
 
 ```bash
 adb -s <serial> shell am force-stop com.egsolutions.zumapos
 ```
 
-Diferencia con `kill`: `kill` mata el proceso (puede dejar tasks sucias); `force-stop` es el equivalente a swipe-from-recents.
+Difference from `kill`: `kill` kills the process (can leave dirty tasks); `force-stop` is the equivalent of swipe-from-recents.
 
-## Permisos runtime (Android 6+)
+## Runtime permissions (Android 6+)
 
-Otorgar permisos sin pasar por el diálogo:
+Grant permissions without going through the dialog:
 ```bash
 adb -s <serial> shell pm grant com.egsolutions.zumapos android.permission.CAMERA
 adb -s <serial> shell pm grant com.egsolutions.zumapos android.permission.RECORD_AUDIO
 ```
 
-Revocar:
+Revoke:
 ```bash
 adb -s <serial> shell pm revoke com.egsolutions.zumapos android.permission.CAMERA
 ```
 
-Listar permisos declarados:
+List declared permissions:
 ```bash
 adb shell dumpsys package com.egsolutions.zumapos | grep "permission" | head -30
 ```
 
-**Atención Android 13+:** `POST_NOTIFICATIONS` y `READ_MEDIA_*` son nuevos y requieren `pm grant` explícito. Si la feature de notificación no se ve, este es el primer lugar a revisar.
+**Android 13+ attention:** `POST_NOTIFICATIONS` and `READ_MEDIA_*` are new and require explicit `pm grant`. If the notification feature is not visible, this is the first place to check.
 
-## Path del APK en el device (post-install)
+## APK path on the device (post-install)
 
 ```bash
 adb shell pm path com.egsolutions.zumapos
 # /data/app/~~xyz.../com.egsolutions.zumapos-XXXX==/base.apk
 ```
 
-Útil para `adb pull` el APK instalado y compararlo con el que tienes localmente (firma, tamaño, hash).
+Useful for `adb pull` the installed APK and compare it with the one you have locally (signature, size, hash).

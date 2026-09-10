@@ -6,86 +6,86 @@ disable-model-invocation: true
 
 # TypeScript
 
-Skill stack-específica del **lenguaje TypeScript**. Complementaria a `frontend`, `backend`, `react-native-expo` y las skills de framework.
+Stack-specific skill for the **TypeScript language**. Complementary to `frontend`, `backend`, `react-native-expo` and the framework skills.
 
-**Fuentes oficiales** (no invención): TypeScript Handbook, Do's and Don'ts, Utility Types, Advanced Types, TSConfig Reference, typescript-eslint Shared Configs.
+**Official sources** (no invention): TypeScript Handbook, Do's and Don'ts, Utility Types, Advanced Types, TSConfig Reference, typescript-eslint Shared Configs.
 
-> **Cómo se activa:** Solo cuando el usuario la pide explícitamente o hace una pregunta type-level en un proyecto TS. Esta skill **no se auto-dispara** desde menciones genéricas de "tipar", "interface" o "refactor".
-
----
-
-## Convenciones que esta skill impone (y dónde cede)
-
-1. **La arquitectura del proyecto gana sobre los defaults de esta skill.** Antes de proponer `tsconfig`, naming, estructura de carpetas o patrón de tipos, leer `AGENTS.md`, `code-style.md`, `architecture.md` o `.context/*` del proyecto. Si el proyecto define convenciones (path aliases, naming de types, dónde viven los types compartidos, reglas de eslint custom, etc.), esas mandan. Esta skill solo aporta cuando el proyecto no define una convención explícita.
-
-2. **Cualquier código TS de ejemplo sigue el estilo del contexto donde se va a usar.**
-   - Si el ejemplo es **UI / React**, este código es **complementario** a la skill de UI/React del proyecto: aplica convenciones de arrow functions, `FC<Props>`, helpers no-UI como `function`, etc.
-   - Si el ejemplo es **backend / Node / Deno / Bun**, sigue las convenciones del proyecto (puede ser CommonJS, ESM, arrow o `function` — no asumas).
-   - Si el ejemplo es **lógica pura / util / type-level**, da igual la sintaxis siempre que compile. Usa la forma más legible.
-
-3. **`strict: true` por defecto en proyectos nuevos.** Si el proyecto no define lo contrario en `AGENTS.md`, esta skill asume `strict: true` y propone los flags adicionales de la §1 abajo. Si el proyecto YA está en modo no-strict, **no** fuerces un upgrade sin hablarlo con el usuario.
-
-4. **`any` casi siempre está mal.** Solo permitido en migración de JS→TS o para tipar una API externa sin tipos disponibles. En TS maduro, `unknown` + narrowing. La regla del proyecto (`@typescript-eslint/no-explicit-any: error`) gana.
-
-5. **Recomendación oficial > preferencia personal.** TypeScript Handbook y Do's and Don'ts son la fuente. Si una práctica contradice "lo que se hacía antes", gana la doc actual.
-
-6. **Naming:** `PascalCase` para types/interfaces/enums. Type parameters: `T` para uno solo, `TKey`/`TValue`/`TItem` para varios. No `IUser`/`TUser` (prefijo Hungarian no es idiomático en TS moderno).
-
-7. **`interface` vs `type`:** `interface` para shapes que se extienden o implementan; `type` para unions, intersections, tuples, mapped types, funciones. `@typescript-eslint/consistent-type-definitions` puede forzar uno u otro.
+> **How it is activated:** Only when the user explicitly asks for it or makes a type-level question in a TS project. This skill **does not auto-trigger** from generic mentions of "typing", "interface" or "refactor".
 
 ---
 
-## Tabla de contenidos
+## Conventions this skill enforces (and where it yields)
 
-| Archivo | Cubre |
+1. **The project's architecture wins over this skill's defaults.** Before proposing `tsconfig`, naming, folder structure, or type patterns, read `AGENTS.md`, `code-style.md`, `architecture.md` or `.context/*` of the project. If the project defines conventions (path aliases, types naming, where shared types live, custom eslint rules, etc.), those win. This skill only contributes when the project does not define an explicit convention.
+
+2. **Any example TS code follows the style of the context where it will be used.**
+   - If the example is **UI / React**, this code is **complementary** to the project's UI/React skill: apply arrow function conventions, `FC<Props>`, non-UI helpers as `function`, etc.
+   - If the example is **backend / Node / Deno / Bun**, follow the project's conventions (it can be CommonJS, ESM, arrow or `function` — do not assume).
+   - If the example is **pure logic / util / type-level**, the syntax does not matter as long as it compiles. Use the most readable form.
+
+3. **`strict: true` by default in new projects.** If the project does not define otherwise in `AGENTS.md`, this skill assumes `strict: true` and proposes the additional flags from §1 below. If the project is ALREADY in non-strict mode, **do not** force an upgrade without discussing it with the user.
+
+4. **`any` is almost always wrong.** Only allowed in JS→TS migration or to type an external API without available types. In mature TS, `unknown` + narrowing. The project's rule (`@typescript-eslint/no-explicit-any: error`) wins.
+
+5. **Official recommendation > personal preference.** The TypeScript Handbook and Do's and Don'ts are the source. If a practice contradicts "what we used to do", the current docs win.
+
+6. **Naming:** `PascalCase` for types/interfaces/enums. Type parameters: `T` for one, `TKey`/`TValue`/`TItem` for several. No `IUser`/`TUser` (Hungarian prefix is not idiomatic in modern TS).
+
+7. **`interface` vs `type`:** `interface` for shapes that are extended or implemented; `type` for unions, intersections, tuples, mapped types, functions. `@typescript-eslint/consistent-type-definitions` can force one or the other.
+
+---
+
+## Table of contents
+
+| File | Covers |
 |---|---|
-| [`references/tsconfig.md`](references/tsconfig.md) | `tsconfig.json` por dominio (Node, browser, bundler, library), flags, module resolution, target |
+| [`references/tsconfig.md`](references/tsconfig.md) | `tsconfig.json` by domain (Node, browser, bundler, library), flags, module resolution, target |
 | [`references/linting.md`](references/linting.md) | `typescript-eslint` v8+ (base vs type-aware), Prettier, flat config |
-| [`references/utility-types.md`](references/utility-types.md) | `Partial`/`Required`/`Readonly`/`Pick`/`Omit`/`Record`/`Exclude`/`Extract`/`NonNullable`/`ReturnType`/`Parameters`/`Awaited`/`NoInfer` con ejemplos |
+| [`references/utility-types.md`](references/utility-types.md) | `Partial`/`Required`/`Readonly`/`Pick`/`Omit`/`Record`/`Exclude`/`Extract`/`NonNullable`/`ReturnType`/`Parameters`/`Awaited`/`NoInfer` with examples |
 | [`references/narrowing.md`](references/narrowing.md) | `typeof`/`instanceof`/`in`, type predicates, discriminated unions, exhaustiveness |
-| [`references/async.md`](references/async.md) | `Promise<T>`, `Awaited<T>`, `no-floating-promises`, `try/catch` con `unknown` |
-| [`references/anti-patterns.md`](references/anti-patterns.md) | Lista completa de Do's and Don'ts con anti-patrón → alternativa |
+| [`references/async.md`](references/async.md) | `Promise<T>`, `Awaited<T>`, `no-floating-promises`, `try/catch` with `unknown` |
+| [`references/anti-patterns.md`](references/anti-patterns.md) | Complete Do's and Don'ts list with anti-pattern → alternative |
 
 ---
 
-## Cheatsheet — decisiones rápidas
+## Cheatsheet — quick decisions
 
-| Necesidad | Solución canónica |
+| Need | Canonical solution |
 |---|---|
-| Tipo de retorno de una función existente | `ReturnType<typeof fn>` |
-| Params de una función existente | `Parameters<typeof fn>` |
-| Promise desenvuelta | `Awaited<T>` |
-| Update parcial de un objeto | `Partial<T>` o `Partial<Pick<T, K>>` |
-| Quitar campos sensibles antes de exponer | `Omit<User, 'password'>` |
-| Diccionario tipado | `Record<Union, V>` |
-| Quitar `null`/`undefined` | `NonNullable<T>` |
-| Forzar presencia de campos opcionales | `Required<T>` |
-| Estado con variantes | Discriminated union + `assertNever(x: never)` (ver [`references/narrowing.md`](references/narrowing.md)) |
-| Valor que puede venir de JSON sin tipo | `unknown` + narrowing con type predicate |
-| Reducir un `Promise.all<T1, T2, T3>` | `Awaited<typeof promise>` por cada elemento |
-| Configurar tsconfig para Vite/Next/etc. | `target: ES2022`, `module: ESNext`, `moduleResolution: bundler` (ver [`references/tsconfig.md`](references/tsconfig.md)) |
-| Configurar tsconfig para Node | `target: ES2022`, `module: NodeNext`, `moduleResolution: NodeNext` |
+| Return type of an existing function | `ReturnType<typeof fn>` |
+| Params of an existing function | `Parameters<typeof fn>` |
+| Unwrapped Promise | `Awaited<T>` |
+| Partial update of an object | `Partial<T>` or `Partial<Pick<T, K>>` |
+| Remove sensitive fields before exposing | `Omit<User, 'password'>` |
+| Typed dictionary | `Record<Union, V>` |
+| Remove `null`/`undefined` | `NonNullable<T>` |
+| Force presence of optional fields | `Required<T>` |
+| State with variants | Discriminated union + `assertNever(x: never)` (see [`references/narrowing.md`](references/narrowing.md)) |
+| Value that may come from untyped JSON | `unknown` + narrowing with type predicate |
+| Unwrap a `Promise.all<T1, T2, T3>` | `Awaited<typeof promise>` for each element |
+| Configure tsconfig for Vite/Next/etc. | `target: ES2022`, `module: ESNext`, `moduleResolution: bundler` (see [`references/tsconfig.md`](references/tsconfig.md)) |
+| Configure tsconfig for Node | `target: ES2022`, `module: NodeNext`, `moduleResolution: NodeNext` |
 
 ---
 
-## Primitivos, any/unknown/never, null/undefined
+## Primitives, any/unknown/never, null/undefined
 
-**Primitivos en minúscula.** NUNCA los wrappers: `string` ✅, `String` ❌. Regla oficial: *"Don't ever use the types `Number`, `String`, `Boolean`, `Symbol`, or `Object`."*
+**Primitives lowercase.** NEVER the wrappers: `string` ✅, `String` ❌. Official rule: *"Don't ever use the types `Number`, `String`, `Boolean`, `Symbol`, or `Object`."*
 
 **`any` vs `unknown` vs `never`:**
-- `any` desactiva el checker. Solo en migración; **nunca** en TS maduro.
-- `unknown` requiere narrowing antes de usar.
-- `never` para funciones que lanzan, loops infinitos y exhaustiveness checks.
+- `any` disables the checker. Only in migration; **never** in mature TS.
+- `unknown` requires narrowing before use.
+- `never` for functions that throw, infinite loops, and exhaustiveness checks.
 
 ```ts
-// ✅ BIEN — narrowing con unknown
+// ✅ GOOD — narrowing with unknown
 function parse(input: unknown): string | number {
   if (typeof input === 'string') return input.toUpperCase();
   if (typeof input === 'number') return input.toFixed(2);
   throw new Error('Invalid input');
 }
 
-// ✅ BIEN — exhaustiveness con never
+// ✅ GOOD — exhaustiveness with never
 type Status = 'pending' | 'success' | 'error';
 const assertNever = (x: never): never => { throw new Error(`Unhandled case: ${String(x)}`); };
 const handle = (s: Status): string => {
@@ -98,9 +98,9 @@ const handle = (s: Status): string => {
 };
 ```
 
-**`void` en callbacks cuyo retorno se ignora**: usa `() => void`, no `() => any`. Regla oficial: *"Using `void` is safer because it prevents you from accidentally using the return value."*
+**`void` for callbacks whose return is ignored**: use `() => void`, not `() => any`. Official rule: *"Using `void` is safer because it prevents you from accidentally using the return value."*
 
-**`null`/`undefined` con `strictNullChecks`:** `string` no acepta `null`. Usa `User | null` (puede ser null) o `{ name?: string }` (puede no estar presente). Con `exactOptionalPropertyTypes: true`, `?:` y `| undefined` no son intercambiables. En `catch`, `e` es `unknown` — narrow con `instanceof Error`.
+**`null`/`undefined` with `strictNullChecks`:** `string` does not accept `null`. Use `User | null` (can be null) or `{ name?: string }` (may not be present). With `exactOptionalPropertyTypes: true`, `?:` and `| undefined` are not interchangeable. In `catch`, `e` is `unknown` — narrow with `instanceof Error`.
 
 ---
 
@@ -115,32 +115,32 @@ type Pair = [string, number];
 type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
 ```
 
-Ver tabla §Utility types abajo para más; casos detallados en [`references/utility-types.md`](references/utility-types.md).
+See table §Utility types below for more; detailed cases in [`references/utility-types.md`](references/utility-types.md).
 
 ---
 
-## Funciones
+## Functions
 
-**Tipos de retorno:** inferencia cuando es obvio; explícito en exports, APIs públicas, o inferencia no trivial. `explicit-module-boundary-types` fuerza tipos en exports; `explicit-function-return-type` los fuerza en todos lados (estricto, solo si la API es muy estable).
+**Return types:** inference when obvious; explicit on exports, public APIs, or non-trivial inference. `explicit-module-boundary-types` forces types on exports; `explicit-function-return-type` forces them everywhere (strict, only if the API is very stable).
 
-**Overloads — específico primero, general al final:**
+**Overloads — specific first, general at the end:**
 
 ```ts
-// ❌ NUNCA — el general eclipsa al específico
+// ❌ NEVER — the general eclipses the specific
 function process(input: string | number): string;
 function process(input: string): string;
 
-// ✅ SÍ — específico primero
+// ✅ YES — specific first
 function process(input: string): string;
 function process(input: string | number): string;
 function process(input: string | number): string { /* impl */ }
 ```
 
-> Regla oficial: *"Don't put more general overloads before more specific overloads."*
+> Official rule: *"Don't put more general overloads before more specific overloads."*
 
-**Optional parameters:** solo cuando **realmente** son opcionales. En **callbacks**, **no** uses optional parameters (la aridad debe ser estable): `(err: Error | null, result: string | null) => void`, no `(err, result?) => void`.
+**Optional parameters:** only when **really** optional. In **callbacks**, **do not** use optional parameters (arity must be stable): `(err: Error | null, result: string | null) => void`, not `(err, result?) => void`.
 
-**Genéricos:** nombra los type parameters (`TKey`, `TValue`) cuando haya más de uno. Limita con constraints (`<T extends Constraint>`) cuando la función lo requiera. No declares type parameters que no usas.
+**Generics:** name the type parameters (`TKey`, `TValue`) when there is more than one. Limit with constraints (`<T extends Constraint>`) when the function requires it. Do not declare type parameters you do not use.
 
 ```ts
 function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] { return obj[key]; }
@@ -148,44 +148,44 @@ function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] { return obj[ke
 
 ---
 
-## Reusabilidad de código TS
+## TS code reusability
 
-Antes de escribir cualquier utility, type o helper:
+Before writing any utility, type, or helper:
 
-1. **Busca en el proyecto** (`grep`/`glob`): `src/utils/`, `src/lib/`, `src/shared/`, `src/types/`, `modules/<feature>/types.ts` o `schemas.ts`.
-2. **Busca en el stdlib de TS** los utility types que ya hacen la transformación. Si `Partial`/`Pick`/`Omit`/`Record`/`Exclude`/`Extract`/`ReturnType`/`Parameters`/`Awaited`/`NonNullable`/`Required`/`Readonly` lo resuelven, no escribas un tipo nuevo.
-3. **Utility type custom** → documenta el "por qué" (no el "qué" — el nombre ya lo dice).
-4. **Reusar en 2+ lugares** → extrae. **1 solo lugar** → no extraigas (YAGNI).
-5. **Reuable existente al que le falta un caso** → extiéndelo con un type parameter antes de duplicar.
+1. **Search the project** (`grep`/`glob`): `src/utils/`, `src/lib/`, `src/shared/`, `src/types/`, `modules/<feature>/types.ts` or `schemas.ts`.
+2. **Search the TS stdlib** for utility types that already do the transformation. If `Partial`/`Pick`/`Omit`/`Record`/`Exclude`/`Extract`/`ReturnType`/`Parameters`/`Awaited`/`NonNullable`/`Required`/`Readonly` solve it, do not write a new type.
+3. **Custom utility type** → document the "why" (not the "what" — the name already says that).
+4. **Reuse in 2+ places** → extract. **Only 1 place** → do not extract (YAGNI).
+5. **Existing reusable missing a case** → extend it with a type parameter before duplicating.
 
 ---
 
 ## Output contract
 
-Cuando esta skill está activa, el código TypeScript que produce el agente debe:
+When this skill is active, the TypeScript code the agent produces must:
 
-1. Compilar sin errores con `tsc --noEmit` corriendo el `tsconfig.json` del proyecto. Sin warnings de tipo.
-2. Pasar el linter (ESLint con typescript-eslint + Prettier) sin warnings ni errores.
-3. No usar `any` salvo justificación explícita en comentario.
-4. Usar `unknown` + narrowing cuando el tipo no es conocido de entrada.
-5. Usar los utility types del stdlib para transformaciones comunes.
-6. Usar discriminated unions para estados o resultados con variantes; campo discriminante literal.
-7. Usar type predicates solo cuando el guard no es built-in.
-8. No usar `// @ts-ignore`. Si es necesario, `// @ts-expect-error: <razón>`.
-9. Exhaustiveness con `never` en switches sobre unions de literals.
-10. Imports/exports type explícitos con `import type` y `export type`. `verbatimModuleSyntax: true` lo enforce.
-11. Naming: types/interfaces en `PascalCase`. Type parameters con `T` para uno, `TKey`/`TValue` para varios.
-12. Tests con tipos verificados: al menos un test verifica el tipo de retorno de una función pública (`expectTypeOf` de Vitest).
+1. Compile without errors with `tsc --noEmit` running the project's `tsconfig.json`. Without type warnings.
+2. Pass the linter (ESLint with typescript-eslint + Prettier) without warnings or errors.
+3. Not use `any` unless explicitly justified in a comment.
+4. Use `unknown` + narrowing when the type is not known up front.
+5. Use the stdlib utility types for common transformations.
+6. Use discriminated unions for states or results with variants; literal discriminant field.
+7. Use type predicates only when the guard is not built-in.
+8. Not use `// @ts-ignore`. If necessary, `// @ts-expect-error: <reason>`.
+9. Exhaustiveness with `never` in switches over literal unions.
+10. Explicit type imports/exports with `import type` and `export type`. `verbatimModuleSyntax: true` enforces it.
+11. Naming: types/interfaces in `PascalCase`. Type parameters with `T` for one, `TKey`/`TValue` for several.
+12. Tests with verified types: at least one test verifies the return type of a public function (`expectTypeOf` from Vitest).
 
-Si un paso no se cumple, decirlo en el handoff. No esconder `any` con un cast.
+If a step is not met, say so in the handoff. Do not hide `any` behind a cast.
 
 ---
 
-## Reglas operativas para el agente
+## Operative rules for the agent
 
-1. **Lee `AGENTS.md` / `code-style.md` del proyecto antes de proponer tsconfig, naming o estructura.** Si el proyecto define convenciones, esas ganan.
-2. **Cita la URL oficial** (typescriptlang.org/docs/handbook/...) al final de cada recomendación técnica específica.
-3. **Si el usuario pregunta algo fuera del scope de TS** (React específico, framework backend, etc.), responde brevemente y sugiere la skill apropiada. No fuerces esta skill.
-4. **No instales dependencias por tu cuenta.** Recomienda el comando y deja que el usuario lo corra.
-5. **Si el usuario da una instrucción explícita que contradice la doc oficial**, sigue al usuario pero advierte el trade-off en 1-2 frases.
-6. **Para "qué versión de X"**, prioriza siempre la última visible en `typescriptlang.org` o el repo del paquete en GitHub.
+1. **Read `AGENTS.md` / `code-style.md` of the project before proposing tsconfig, naming, or structure.** If the project defines conventions, those win.
+2. **Cite the official URL** (typescriptlang.org/docs/handbook/...) at the end of each specific technical recommendation.
+3. **If the user asks something outside TS scope** (React-specific, backend framework, etc.), respond briefly and suggest the appropriate skill. Do not force this skill.
+4. **Do not install dependencies on your own.** Recommend the command and let the user run it.
+5. **If the user gives an explicit instruction that contradicts the official docs**, follow the user but warn about the trade-off in 1-2 sentences.
+6. **For "what version of X"**, always prioritize the latest visible on `typescriptlang.org` or the package repo on GitHub.

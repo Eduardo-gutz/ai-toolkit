@@ -1,13 +1,13 @@
-# Anti-patrones — Do's and Don'ts
+# Anti-patterns — Do's and Don'ts
 
-> **Fuente oficial:** https://www.typescriptlang.org/docs/handbook/2/types-from-types.html · https://www.typescriptlang.org/docs/handbook/declaration-files/do-s-and-don-ts.html · https://typescript-eslint.io/rules/
+> **Official source:** https://www.typescriptlang.org/docs/handbook/2/types-from-types.html · https://www.typescriptlang.org/docs/handbook/declaration-files/do-s-and-don-ts.html · https://typescript-eslint.io/rules/
 
-## 1. Tipos primitivos
+## 1. Primitive types
 
-| ❌ Anti-patrón | ✅ Alternativa | Por qué |
+| ❌ Anti-pattern | ✅ Alternative | Why |
 |---|---|---|
-| `String`, `Number`, `Boolean`, `Symbol`, `Object` (mayúsculas) | `string`, `number`, `boolean`, `symbol`, `object` | *"Don't ever use the types `Number`, `String`, `Boolean`, `Symbol`, or `Object`."* — Handbook. Los mayúsculas son wrappers de objeto; los minúscula son primitivos. |
-| `Function` (tipo genérico) | `(args: X) => Y` específica | `Function` no dice nada sobre args ni retorno. |
+| `String`, `Number`, `Boolean`, `Symbol`, `Object` (capitalized) | `string`, `number`, `boolean`, `symbol`, `object` | *"Don't ever use the types `Number`, `String`, `Boolean`, `Symbol`, or `Object`."* — Handbook. The capitalized ones are object wrappers; the lowercase ones are primitives. |
+| `Function` (generic type) | Specific `(args: X) => Y` | `Function` says nothing about args or return. |
 
 ```ts
 // ❌
@@ -19,19 +19,19 @@ function fn(cb: (err: Error | null, result: string) => void) { /* ... */ }
 
 ## 2. `any` vs `unknown`
 
-| ❌ Anti-patrón | ✅ Alternativa |
+| ❌ Anti-pattern | ✅ Alternative |
 |---|---|
-| `any` declarado explícitamente | `unknown` + narrowing (ver `references/narrowing.md`) |
-| `as any` para "arreglar" un error de tipo | `as unknown as X` + narrow, o arreglar el tipo real |
-| `any` en APIs externas sin tipos | `unknown` + un type guard o validación runtime |
+| `any` declared explicitly | `unknown` + narrowing (see `references/narrowing.md`) |
+| `as any` to "fix" a type error | `as unknown as X` + narrow, or fix the real type |
+| `any` on external APIs without types | `unknown` + a type guard or runtime validation |
 
 ```ts
-// ❌ — any desactiva el checker para TODO el código que lo toca
+// ❌ — any disables the checker for ALL code that touches it
 function process(data: any) {
-  return data.foo.bar.baz; // ¿Y si data es null? No hay forma de saber.
+  return data.foo.bar.baz; // What if data is null? No way to know.
 }
 
-// ✅ — unknown fuerza a narrowar
+// ✅ — unknown forces narrowing
 function process(data: unknown) {
   if (typeof data === 'object' && data !== null && 'foo' in data) {
     const foo = data.foo as { bar?: { baz?: string } };
@@ -40,36 +40,36 @@ function process(data: unknown) {
 }
 ```
 
-**`any` permitido solo en:**
-- Migración gradual de JS a TS (con `// TODO: type this` o equivalente).
-- Tipar APIs externas que no tienen tipos (temporalmente, mientras se consigue el `.d.ts`).
-- Tests con mocks (con `eslint-disable-next-line @typescript-eslint/no-explicit-any` justificado).
+**`any` allowed only in:**
+- Gradual migration from JS to TS (with `// TODO: type this` or equivalent).
+- Typing external APIs that have no types (temporarily, while you get the `.d.ts`).
+- Tests with mocks (with `eslint-disable-next-line @typescript-eslint/no-explicit-any` justified).
 
-Activar `@typescript-eslint/no-explicit-any: error` en producción.
+Enable `@typescript-eslint/no-explicit-any: error` in production.
 
 ## 3. Type assertions
 
-| ❌ Anti-patrón | ✅ Alternativa |
+| ❌ Anti-pattern | ✅ Alternative |
 |---|---|
-| `// @ts-ignore` sin razón | `// @ts-expect-error: <razón>` o arreglar el tipo |
-| `!` non-null assertion indiscriminado | Validar primero (`if (x !== null) { x.foo }`) |
-| Type assertion innecesaria | Quitar el cast — si el tipo es el correcto, no hace falta |
+| `// @ts-ignore` without reason | `// @ts-expect-error: <reason>` or fix the type |
+| `!` non-null assertion indiscriminate | Validate first (`if (x !== null) { x.foo }`) |
+| Unnecessary type assertion | Remove the cast — if the type is correct, the cast is not needed |
 
 ```ts
-// ❌ — ts-ignore esconde un problema real
+// ❌ — ts-ignore hides a real problem
 // @ts-ignore
 const x = something.nope.unknown;
 
-// ✅ — ts-expect-error documenta el "por qué" y falla si el problema se arregla
+// ✅ — ts-expect-error documents the "why" and fails if the problem gets fixed
 // @ts-expect-error: third-party types are wrong in this version, fixed in 2.4.0
 const x = something.nope.unknown;
 
-// ❌ — non-null assertion puede reventar
+// ❌ — non-null assertion can blow up
 function process(user: User | null) {
-  return user!.id; // 💥 si user es null
+  return user!.id; // 💥 if user is null
 }
 
-// ✅ — narrow primero
+// ✅ — narrow first
 function process(user: User | null) {
   if (!user) throw new Error('user is null');
   return user.id;
@@ -78,32 +78,32 @@ function process(user: User | null) {
 
 ## 4. `==` vs `===`
 
-| ❌ Anti-patrón | ✅ Alternativa |
+| ❌ Anti-pattern | ✅ Alternative |
 |---|---|
 | `==` / `!=` | `===` / `!==` |
 
 ```ts
-// ❌ — '== null' también matchea undefined (regla vieja, no idiomática en TS moderno)
+// ❌ — '== null' also matches undefined (old rule, not idiomatic in modern TS)
 if (value == null) { /* ... */ }
 
-// ✅ — explícito
+// ✅ — explicit
 if (value === null || value === undefined) { /* ... */ }
 ```
 
-`eslint: eqeqeq` lo enforce.
+`eslint: eqeqeq` enforces it.
 
 ## 5. Overloads
 
-| ❌ Anti-patrón | ✅ Alternativa |
+| ❌ Anti-pattern | ✅ Alternative |
 |---|---|
-| General antes que específico | Específico primero, general al final |
+| General before specific | Specific first, general at the end |
 
 ```ts
-// ❌ NUNCA — el general eclipsa al específico
+// ❌ NEVER — the general eclipses the specific
 function process(input: string | number): string;
 function process(input: string): string;
 
-// ✅ SÍ
+// ✅ YES
 function process(input: string): string;
 function process(input: string | number): string;
 function process(input: string | number): string { /* impl */ }
@@ -111,25 +111,25 @@ function process(input: string | number): string { /* impl */ }
 
 > *"Don't put more general overloads before more specific overloads."*
 
-## 6. Optional parameters en callbacks
+## 6. Optional parameters in callbacks
 
-| ❌ Anti-patrón | ✅ Alternativa |
+| ❌ Anti-pattern | ✅ Alternative |
 |---|---|
 | `(err, result?) => void` | `(err: Error \| null, result: string \| null) => void` |
 
-En callbacks, la aridad debe ser estable. El receptor siempre llama con el mismo número de args.
+In callbacks, the arity must be stable. The receiver always calls with the same number of args.
 
 ## 7. `enum`
 
-| ❌ Anti-patrón | ✅ Alternativa |
+| ❌ Anti-pattern | ✅ Alternative |
 |---|---|
-| `enum` (mayoría de casos) | `as const` object o union de literals |
+| `enum` (most cases) | `as const` object or union of literals |
 
 ```ts
-// ❌ — enum compila a un objeto runtime que no tree-shakea bien
+// ❌ — enum compiles to a runtime object that does not tree-shake well
 enum Status { Idle, Loading, Success, Error }
 
-// ✅ — type literal + objeto readonly
+// ✅ — literal type + readonly object
 const Status = {
   Idle: 'idle',
   Loading: 'loading',
@@ -140,68 +140,68 @@ type Status = typeof Status[keyof typeof Status];
 // 'idle' | 'loading' | 'success' | 'error'
 ```
 
-**`enum` permitido solo cuando:**
-- Interoperabilidad con APIs externas que lo esperan (Java, C#, etc.).
-- Equipos grandes con convención de enum ya establecida.
+**`enum` allowed only when:**
+- Interoperability with external APIs that expect it (Java, C#, etc.).
+- Large teams with an established enum convention.
 
 ## 8. `interface` vs `type`
 
-| ❌ Anti-patrón | ✅ Alternativa |
+| ❌ Anti-pattern | ✅ Alternative |
 |---|---|
-| `type` para shape que se extiende | `interface extends ...` |
-| `interface` para union | `type A = 'x' \| 'y'` |
+| `type` for a shape that extends | `interface extends ...` |
+| `interface` for a union | `type A = 'x' \| 'y'` |
 
-Ver SKILL.md §"Object types" para la guía completa.
+See SKILL.md §"Object types" for the full guide.
 
 ## 9. Decorators
 
-| ❌ Anti-patrón | ✅ Alternativa |
+| ❌ Anti-pattern | ✅ Alternative |
 |---|---|
-| Mezclar legacy (`experimentalDecorators`) y TC39 decorators | Elegir uno y ser consistente |
+| Mixing legacy (`experimentalDecorators`) and TC39 decorators | Choose one and be consistent |
 
 ```jsonc
-// Legacy (NestJS, TypeORM hasta v0.3)
+// Legacy (NestJS, TypeORM up to v0.3)
 { "experimentalDecorators": true, "emitDecoratorMetadata": true }
 
 // TC39 (Stage 3, TS 5.0+)
-// No se necesita flag — es el default moderno
+// No flag needed — it is the modern default
 ```
 
 ## 10. Imports / Exports
 
-| ❌ Anti-patrón | ✅ Alternativa |
+| ❌ Anti-pattern | ✅ Alternative |
 |---|---|
-| `import { X } from 'y'` cuando `X` es solo tipo | `import type { X } from 'y'` o `import { type X }` |
-| Mezclar default y named exports inconsistentemente | Seguir la convención del proyecto |
+| `import { X } from 'y'` when `X` is only a type | `import type { X } from 'y'` or `import { type X }` |
+| Mixing default and named exports inconsistently | Follow the project's convention |
 
 ```ts
-// ❌ — fuerza a Node/bundler a importar el archivo aunque solo uses el tipo
+// ❌ — forces Node/bundler to import the file even if you only use the type
 import { User } from './types';
 
 // ✅
 import type { User } from './types';
 ```
 
-`verbatimModuleSyntax: true` lo enforce automáticamente.
+`verbatimModuleSyntax: true` enforces it automatically.
 
 ## 11. Naming
 
-| ❌ Anti-patrón | ✅ Alternativa |
+| ❌ Anti-pattern | ✅ Alternative |
 |---|---|
-| `IUser` (prefijo Hungarian) | `User` |
-| `TUser` (template parameter con prefijo) | `T` o `TUser` solo si `T` colisiona |
+| `IUser` (Hungarian prefix) | `User` |
+| `TUser` (template parameter with prefix) | `T` or `TUser` only if `T` collides |
 | `user_type` (snake_case) | `User` (PascalCase) |
-| `userInfo` para un type | `UserInfo` |
+| `userInfo` for a type | `UserInfo` |
 
-## 12. `void` como tipo de retorno
+## 12. `void` as return type
 
-| ❌ Anti-patrón | ✅ Alternativa |
+| ❌ Anti-pattern | ✅ Alternative |
 |---|---|
-| Callback retorna `any` | `() => void` |
+| Callback returns `any` | `() => void` |
 
 ```ts
 // ❌
-arr.forEach((item) => doSomething(item)); // doSomething puede retornar algo sin warning
+arr.forEach((item) => doSomething(item)); // doSomething can return something without warning
 
 // ✅
 arr.forEach((item: T): void => doSomething(item));
@@ -209,11 +209,11 @@ arr.forEach((item: T): void => doSomething(item));
 
 > *"Using `void` is safer because it prevents you from accidentally using the return value."*
 
-## 13. Type aliases vs tipos inline
+## 13. Type aliases vs inline types
 
-| ❌ Anti-patrón | ✅ Alternativa |
+| ❌ Anti-pattern | ✅ Alternative |
 |---|---|
-| Repetir un shape inline en 3+ lugares | Extraer a un type alias |
+| Repeating a shape inline in 3+ places | Extract to a type alias |
 
 ```ts
 // ❌
@@ -228,33 +228,33 @@ function updateUser(): UserSummary { /* ... */ }
 function listUsers(): UserSummary[] { /* ... */ }
 ```
 
-## 14. `as const` mal aplicado
+## 14. `as const` misapplied
 
 ```ts
-// ❌ — no tree-shakea bien, no da literal types
+// ❌ — does not tree-shake well, does not give literal types
 const config = { host: 'localhost', port: 3000 };
 
 // ✅ — readonly + literal types
 const config = { host: 'localhost', port: 3000 } as const;
-// config.host: 'localhost' (literal, no string)
-// config.port: 3000 (literal, no number)
+// config.host: 'localhost' (literal, not string)
+// config.port: 3000 (literal, not number)
 ```
 
-## 15. Lista rápida de reglas typescript-eslint que activan automáticamente
+## 15. Quick list of typescript-eslint rules that activate automatically
 
-| Regla | Qué enforce |
+| Rule | What it enforces |
 |---|---|
 | `no-explicit-any` | No `any` |
-| `no-unused-vars` | No vars/imports sin usar |
-| `consistent-type-imports` | `import type` para types |
+| `no-unused-vars` | No unused vars/imports |
+| `consistent-type-imports` | `import type` for types |
 | `ban-types` | No `Object`/`Function`/`<any>` |
 | `no-namespace` | No `namespace` |
 | `no-non-null-assertion` | No `!` |
-| `no-magic-numbers` | No números literales (configurable) |
-| `eqeqeq` | Solo `===`/`!==` |
-| `prefer-nullish-coalescing` | `??` en vez de `\|\|` cuando aplica |
-| `prefer-optional-chain` | `?.` en vez de `&&` chains |
-| `no-floating-promises` | No promises sin await (requiere type-aware) |
-| `no-misused-promises` | No Promise donde se espera valor (type-aware) |
-| `await-thenable` | `await` solo sobre Promise (type-aware) |
-| `no-unnecessary-condition` | No narrowing redundante (type-aware) |
+| `no-magic-numbers` | No literal numbers (configurable) |
+| `eqeqeq` | Only `===`/`!==` |
+| `prefer-nullish-coalescing` | `??` instead of `\|\|` when applicable |
+| `prefer-optional-chain` | `?.` instead of `&&` chains |
+| `no-floating-promises` | No un-awaited promises (requires type-aware) |
+| `no-misused-promises` | No Promise where a value is expected (type-aware) |
+| `await-thenable` | `await` only over Promise (type-aware) |
+| `no-unnecessary-condition` | No redundant narrowing (type-aware) |

@@ -1,12 +1,12 @@
-# Features nativas (cámara, ubicación, notificaciones, permisos)
+# Native features (camera, location, notifications, permissions)
 
-> **Fuentes oficiales:** https://docs.expo.dev/versions/latest/sdk/camera/ · https://docs.expo.dev/versions/latest/sdk/imagepicker/ · https://docs.expo.dev/versions/latest/sdk/location/ · https://docs.expo.dev/versions/latest/sdk/notifications/ · https://docs.expo.dev/versions/latest/sdk/image/
+> **Official sources:** https://docs.expo.dev/versions/latest/sdk/camera/ · https://docs.expo.dev/versions/latest/sdk/imagepicker/ · https://docs.expo.dev/versions/latest/sdk/location/ · https://docs.expo.dev/versions/latest/sdk/notifications/ · https://docs.expo.dev/versions/latest/sdk/image/
 
-## 1. Patrón universal de permisos
+## 1. Universal permissions pattern
 
-**El paquete `expo-permissions` fue deprecado y eliminado** desde SDK 48. Cada módulo Expo expone su propio hook `use*Permissions`.
+**The `expo-permissions` package was deprecated and removed** since SDK 48. Each Expo module exposes its own `use*Permissions` hook.
 
-### Estructura del `PermissionResponse`
+### `PermissionResponse` structure
 
 ```ts
 {
@@ -17,7 +17,7 @@
 }
 ```
 
-### Patrón canónico (idéntico en todos los módulos)
+### Canonical pattern (identical across all modules)
 
 ```tsx
 import { useCameraPermissions } from 'expo-camera';
@@ -25,43 +25,43 @@ import { Linking } from 'react-native';
 
 const [permission, requestPermission] = useCameraPermissions();
 
-if (permission === null) return <Loading />;                 // cargando
+if (permission === null) return <Loading />;                 // loading
 if (!permission.granted) {
   if (permission.canAskAgain) {
     return <Button title="Grant" onPress={requestPermission} />;
   }
   return <Button title="Open Settings" onPress={() => Linking.openURL('app-settings:')} />;
 }
-// usar feature...
+// use feature...
 ```
 
-### Hooks por dominio
+### Hooks by domain
 
-| Módulo | Hook | Permiso |
+| Module | Hook | Permission |
 |---|---|---|
-| `expo-camera` | `useCameraPermissions` | cámara |
-| `expo-camera` | `useMicrophonePermissions` | micrófono |
-| `expo-image-picker` | `useCameraPermissions` | cámara |
+| `expo-camera` | `useCameraPermissions` | camera |
+| `expo-camera` | `useMicrophonePermissions` | microphone |
+| `expo-image-picker` | `useCameraPermissions` | camera |
 | `expo-image-picker` | `useMediaLibraryPermissions({ writeOnly })` | media library |
 | `expo-location` | `useForegroundPermissions` | location when in use |
 | `expo-location` | `useBackgroundPermissions` | location always |
 | `expo-location` | `useMotionActivityPermissions` | motion/activity |
 | `expo-notifications` | `getPermissionsAsync()` + `requestPermissionsAsync()` (no hook) | notifications |
 
-### Anti-patrones
+### Anti-patterns
 
-> ❌ Asumir permisos OK solo chequeando root `status` en iOS → usar `settings.ios?.status` (granular).
-> ❌ Ignorar `canAskAgain === false` → mandar a Settings con `Linking.openURL('app-settings:')`.
+> ❌ Assume permissions OK only by checking the root `status` on iOS → use `settings.ios?.status` (granular).
+> ❌ Ignore `canAskAgain === false` → send to Settings with `Linking.openURL('app-settings:')`.
 
-## 2. Cámara — `expo-camera` vs `expo-image-picker`
+## 2. Camera — `expo-camera` vs `expo-image-picker`
 
-**Cuándo cada una:**
-- `expo-camera` → preview en vivo, control total, escaneo de códigos de barras.
-- `expo-image-picker` → lanza UI nativa. Path más simple para "elegir foto" o "tomar foto rápida".
+**When to use each:**
+- `expo-camera` → live preview, full control, barcode scanning.
+- `expo-image-picker` → launches native UI. Simpler path for "pick a photo" or "take a quick photo".
 
 ### `expo-camera`
 
-Plataformas: Android (device only), iOS (device only), Web.
+Platforms: Android (device only), iOS (device only), Web.
 
 ```tsx
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
@@ -76,10 +76,10 @@ if (!permission.granted) {
 return <CameraView style={styles.camera} facing={facing} />;
 ```
 
-**Features oficiales:** barcode scanning (`onBarcodeScanned`, `barcodeScannerSettings`), torch, zoom, flash, picture (`takePictureAsync`), video (`recordAsync`), scanner UI nativo (`launchScanner` en iOS 16+ usa `DataScannerViewController`).
+**Official features:** barcode scanning (`onBarcodeScanned`, `barcodeScannerSettings`), torch, zoom, flash, picture (`takePictureAsync`), video (`recordAsync`), native scanner UI (`launchScanner` on iOS 16+ uses `DataScannerViewController`).
 
-**Anti-patrón crítico:**
-> ❌ *"Only one Camera preview can be active at any given time."* Si tienes varios screens con cámara, desmonta `Camera`/`CameraView` cuando el screen pierde foco.
+**Critical anti-pattern:**
+> ❌ *"Only one Camera preview can be active at any given time."* If you have several screens with a camera, unmount `Camera`/`CameraView` when the screen loses focus.
 
 ### `expo-image-picker`
 
@@ -99,12 +99,12 @@ let result = await ImagePicker.launchImageLibraryAsync({
 if (!result.canceled) setImage(result.assets[0].uri);
 ```
 
-**Cambio importante SDK 54:**
+**Important SDK 54 change:**
 > *"In SDK 54 and later, the default configuration keeps `allowsEditing` set to `false` and `videoExportPreset` set to `'Passthrough'`. These settings return the original asset (including HEIC and AVIF files) instantly because the picker skips compression, but iOS requires media library permission to access the original file and displays a permission dialog immediately after the user selects a video."*
 
-> **Para evitar el dialog post-selección, pide permisos manualmente antes de abrir el picker** con `requestMediaLibraryPermissionsAsync` o `useMediaLibraryPermissions`.
+> **To avoid the post-selection dialog, request permissions manually before opening the picker** with `requestMediaLibraryPermissionsAsync` or `useMediaLibraryPermissions`.
 
-## 3. Geolocalización — `expo-location`
+## 3. Geolocation — `expo-location`
 
 ```tsx
 import * as Location from 'expo-location';
@@ -121,7 +121,7 @@ useEffect(() => {
 }, []);
 ```
 
-### Tipos de permiso
+### Permission types
 
 | Hook | iOS | Android |
 |---|---|---|
@@ -129,13 +129,13 @@ useEffect(() => {
 | `useBackgroundPermissions` | `Always` | `ACCESS_BACKGROUND_LOCATION` |
 | `useMotionActivityPermissions` | Motion & Fitness | `ACTIVITY_RECOGNITION` |
 
-### Caveats críticos oficiales
+### Critical official caveats
 
-1. **Foreground primero:** *"your app can't obtain background permission without foreground permission"*.
+1. **Foreground first:** *"your app can't obtain background permission without foreground permission"*.
 2. **Allow Once (iOS):** *"iOS does not provide a way to detect whether the user selected `Allow Once` or `Allow While Using the App`. Both responses result in `When In Use` authorization."*
-3. **Allow Once → background silenciosamente falla:** *"If the user selected `Allow Once` and you subsequently call `requestBackgroundPermissionsAsync` in the same session, the system **will not show another prompt**. Instead, the request will **silently fail**"*.
-4. **Android 11+ background:** abre **system settings page** directamente (no dialog) → explicar al usuario antes con un `Modal`.
-5. **Background location no funciona en Expo Go iOS:** *"you must use a development build"*.
+3. **Allow Once → background silently fails:** *"If the user selected `Allow Once` and you subsequently call `requestBackgroundPermissionsAsync` in the same session, the system **will not show another prompt**. Instead, the request will **silently fail**"*.
+4. **Android 11+ background:** opens the **system settings page** directly (no dialog) → explain to the user first with a `Modal`.
+5. **Background location does not work in Expo Go iOS:** *"you must use a development build"*.
 6. **Android:** *"A terminated app will not automatically restart when a location or geofencing event occurs"*.
 
 ### Background — prereq
@@ -147,26 +147,26 @@ TaskManager.defineTask(YOUR_TASK_NAME, ({ data: { locations }, error }) => {
   // handle
 });
 
-// iOS: agregar 'location' a UIBackgroundModes en Info.plist
-// Se aplica automático con CNG (prebuild)
+// iOS: add 'location' to UIBackgroundModes in Info.plist
+// Applied automatically with CNG (prebuild)
 ```
 
-## 4. Notificaciones — `expo-notifications`
+## 4. Notifications — `expo-notifications`
 
-### Caveats importantes
+### Important caveats
 
 > *"Push notifications (remote notifications) functionality provided by `expo-notifications` is unavailable in Expo Go on Android from SDK 53. A development build is required."*
 
 > *"On Android 13, app users must opt-in to receive notifications via a permissions prompt automatically triggered by the operating system. This prompt will not appear until at least one notification channel is created."*
 
-> ❌ **Push en Expo Go Android (SDK 53+) → development build obligatorio.**
+> ❌ **Push in Expo Go Android (SDK 53+) → development build mandatory.**
 
-### Tipos de token
+### Token types
 
-- `getDevicePushTokenAsync()` → **token nativo** (FCM Android / APNs iOS). Para integrar con tu push service.
-- `getExpoPushTokenAsync({ projectId })` → **token Expo** (`ExponentPushToken[...]`). Para Expo Push Service.
+- `getDevicePushTokenAsync()` → **native token** (FCM Android / APNs iOS). To integrate with your push service.
+- `getExpoPushTokenAsync({ projectId })` → **Expo token** (`ExponentPushToken[...]`). For the Expo Push Service.
 
-### Patrón oficial completo
+### Complete official pattern
 
 ```tsx
 import * as Notifications from 'expo-notifications';
@@ -206,7 +206,7 @@ async function registerForPushNotificationsAsync() {
 }
 ```
 
-### Deep linking con push (Expo Router)
+### Deep linking with push (Expo Router)
 
 ```tsx
 import { useEffect } from 'react';
@@ -215,7 +215,7 @@ import { router } from 'expo-router';
 
 const useNotificationObserver = (): void => {
   useEffect(() => {
-    // helper interno (no UI, fuera del componente) — usa function
+    // internal helper (no UI, outside the component) — uses function
     function redirect(notification: Notifications.Notification) {
       const url = notification.request.content.data?.url;
       if (typeof url === 'string') router.push(url);
@@ -231,9 +231,9 @@ const useNotificationObserver = (): void => {
 };
 ```
 
-### Anti-patrones oficiales
+### Official anti-patterns
 
-- ❌ `getExpoPushTokenAsync` **antes** de `setNotificationChannelAsync` en Android 13+.
-- ❌ Asumir permisos OK solo con root `status` en iOS → usar `settings.ios?.status`.
-- ❌ Push en Expo Go Android (SDK 53+) → development build obligatorio.
-- ❌ Ignorar background notifications en iOS sin `remote-notification` en `UIBackgroundModes`.
+- ❌ `getExpoPushTokenAsync` **before** `setNotificationChannelAsync` on Android 13+.
+- ❌ Assume permissions OK only with the root `status` on iOS → use `settings.ios?.status`.
+- ❌ Push in Expo Go Android (SDK 53+) → development build mandatory.
+- ❌ Ignore background notifications on iOS without `remote-notification` in `UIBackgroundModes`.

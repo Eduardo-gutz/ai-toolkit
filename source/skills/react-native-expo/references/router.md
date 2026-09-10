@@ -1,55 +1,55 @@
 # expo-router — File-based routing
 
-> **Fuentes oficiales:** https://docs.expo.dev/router/introduction/ · https://docs.expo.dev/router/basics/core-concepts/ · https://docs.expo.dev/router/basics/notation/ · https://docs.expo.dev/router/basics/navigation-layouts/ · https://docs.expo.dev/router/basics/navigation/ · https://docs.expo.dev/router/advanced/stack/ · https://docs.expo.dev/router/advanced/modals/ · https://docs.expo.dev/router/reference/typed-routes/ · https://docs.expo.dev/router/reference/url-parameters/ · https://docs.expo.dev/linking/overview/
+> **Official sources:** https://docs.expo.dev/router/introduction/ · https://docs.expo.dev/router/basics/core-concepts/ · https://docs.expo.dev/router/basics/notation/ · https://docs.expo.dev/router/basics/navigation-layouts/ · https://docs.expo.dev/router/basics/navigation/ · https://docs.expo.dev/router/advanced/stack/ · https://docs.expo.dev/router/advanced/modals/ · https://docs.expo.dev/router/reference/typed-routes/ · https://docs.expo.dev/router/reference/url-parameters/ · https://docs.expo.dev/linking/overview/
 >
-> **Convención de código de esta skill:** componentes, screens y hooks como arrow functions. Helpers/utils no-UI como `function`.
+> **This skill's code convention:** components, screens, and hooks as arrow functions. Helpers/utils non-UI as `function`.
 
-## 1. Posición oficial: usar expo-router por defecto
+## 1. Official position: use expo-router by default
 
 > *"We recommend using Expo Router for all the features described above [deep linking, automatic, native, shareable, optimized, universal]. With other navigation libraries, you might have to implement your own strategies for some of these features."*
 
-Comparativa con React Navigation:
+Comparison with React Navigation:
 
-| Aspecto | expo-router | React Navigation v7 |
+| Aspect | expo-router | React Navigation v7 |
 |---|---|---|
 | Routing | File-based (`src/app/*`) | Manual (`<Stack.Navigator>`) |
-| Deep linking | Automático | Manual (`linking` prop) |
-| Typed routes | Built-in (`experiments.typedRoutes`) | Manual con generics |
-| Static rendering (web) | Built-in (SSG) | No built-in |
-| Async routes / bundle splitting | Built-in (`@expo/metro-runtime`) | No built-in |
+| Deep linking | Automatic | Manual (`linking` prop) |
+| Typed routes | Built-in (`experiments.typedRoutes`) | Manual with generics |
+| Static rendering (web) | Built-in (SSG) | Not built-in |
+| Async routes / bundle splitting | Built-in (`@expo/metro-runtime`) | Not built-in |
 
-**Regla:** nueva app universal (iOS + Android + Web) → Expo Router. Solo native + control fino → React Navigation v7.
+**Rule:** new universal app (iOS + Android + Web) → Expo Router. Only native + fine control → React Navigation v7.
 
-## 2. Las 7 reglas del file-based routing
+## 2. The 7 rules of file-based routing
 
-1. **Todas las pantallas viven en `src/app/`.**
-2. **Cada pantalla tiene una URL** (universal deep linking).
-3. **`index.tsx` es la initial route** (el primer `index.tsx` que match `/`).
-4. **`_layout.tsx` reemplaza a `App.tsx`** — aquí va inicialización (fonts, providers, splash).
-5. **Default template usa platform-specific tabs.** Android/iOS usan Native tabs; web usa Custom tabs de `expo-router/ui`. Se logra con extensions (`*.native.tsx` vs `*.tsx`).
-6. **Componentes no-navegación viven fuera de `src/app/`** (`src/components`, `src/hooks`, `src/constants`).
-7. **Para stack/tabs/drawer:** ver `references/router.md` §Layouts y `/router/advanced/`.
+1. **All screens live in `src/app/`.**
+2. **Each screen has a URL** (universal deep linking).
+3. **`index.tsx` is the initial route** (the first `index.tsx` that matches `/`).
+4. **`_layout.tsx` replaces `App.tsx`** — initialization (fonts, providers, splash) goes here.
+5. **Default template uses platform-specific tabs.** Android/iOS use Native tabs; web uses Custom tabs from `expo-router/ui`. Achieved with extensions (`*.native.tsx` vs `*.tsx`).
+6. **Non-navigation components live outside `src/app/`** (`src/components`, `src/hooks`, `src/constants`).
+7. **For stack/tabs/drawer:** see `references/router.md` §Layouts and `/router/advanced/`.
 
-## 3. Notación de archivos
+## 3. File notation
 
-| Notación | Significado | Ejemplo |
+| Notation | Meaning | Example |
 |---|---|---|
 | `home.tsx` | Static route | `/feed/favorites` |
 | `[userName].tsx` | Dynamic route | `/evanbacon` → `useLocalSearchParams()` |
 | `[...slug].tsx` | Catch-all (rest) | `/docs/a/b/c` → `slug: ['a','b','c']` |
-| `(home)/` | Route group (no aparece en URL) | `(home)/settings.tsx` ⇒ `/settings` |
-| `index.tsx` | Default route del directorio | `/profile` |
+| `(home)/` | Route group (does not appear in URL) | `(home)/settings.tsx` ⇒ `/settings` |
+| `index.tsx` | Directory's default route | `/profile` |
 | `_layout.tsx` | Layout file (Stack/Tabs/Slot) | — |
-| `+not-found.tsx` | Catch-all para URLs inválidas | — |
-| `+html.tsx` | HTML boilerplate para web | — |
+| `+not-found.tsx` | Catch-all for invalid URLs | — |
+| `+html.tsx` | HTML boilerplate for web | — |
 | `+native-intent.tsx` | Custom intent linking (Android) | — |
 | `+middleware.ts` | Pre-render middleware (web) | — |
 
-> ⚠️ `/assets` está reservado por Metro y expo-router. Ver https://docs.expo.dev/router/reference/reserved-paths.md
+> ⚠️ `/assets` is reserved by Metro and expo-router. See https://docs.expo.dev/router/reference/reserved-paths.md
 
 ## 4. Layouts: Stack, Tabs, Slot
 
-### Root layout patrón oficial
+### Official root layout pattern
 
 ```tsx
 // src/app/_layout.tsx
@@ -143,7 +143,7 @@ const AppTabs: FC<{}> = () => (
 export default AppTabs;
 ```
 
-### Slot (layout sin navegador — header/footer fijo)
+### Slot (layout without navigator — fixed header/footer)
 
 ```tsx
 // src/app/_layout.tsx
@@ -161,9 +161,9 @@ const LayoutWithHeader: FC<{}> = () => (
 export default LayoutWithHeader;
 ```
 
-## 5. Navegación: Link, useRouter, params
+## 5. Navigation: Link, useRouter, params
 
-### `useRouter` (imperativo)
+### `useRouter` (imperative)
 
 ```tsx
 // src/app/index.tsx
@@ -179,7 +179,7 @@ const HomeScreen: FC<{}> = () => {
 export default HomeScreen;
 ```
 
-### `<Link>` (declarativo)
+### `<Link>` (declarative)
 
 ```tsx
 import { FC } from 'react';
@@ -197,7 +197,7 @@ const Links: FC<{}> = () => (
 export default Links;
 ```
 
-### Rutas dinámicas
+### Dynamic routes
 
 ```tsx
 <Link href={{ pathname: '/user/[id]', params: { id: 'bacon' } }}>View user</Link>
@@ -210,7 +210,7 @@ export default Links;
 <Link href={{ pathname: '/users', params: { limit: 20 } }}>View users</Link>
 ```
 
-### Actualizar params sin navegar
+### Update params without navigating
 
 ```tsx
 <Pressable onPress={() => router.setParams({ limit: 50 })}>View more</Pressable>
@@ -232,30 +232,30 @@ export default Page;
 <Link href="/about" prefetch />
 ```
 
-> **Limitaciones del prefetch:** el screen preloaded no puede usar `router` imperativo, ni `useNavigation().setOptions()`, ni listeners de focus/tabPress.
+> **Prefetch limitations:** the preloaded screen cannot use the imperative `router`, nor `useNavigation().setOptions()`, nor focus/tabPress listeners.
 
-### Initial route en deep linking
+### Initial route in deep linking
 
 ```tsx
 // src/app/products/_layout.tsx
 export const unstable_settings = { initialRouteName: 'index' };
 ```
 
-### Acciones imperativas del stack (SDK 55+)
+### Imperative stack actions (SDK 55+)
 
 ```ts
-router.navigate(url)         // push o unwind
-router.push(url)            // siempre push
-router.replace(url)         // reemplaza el actual
+router.navigate(url)         // push or unwind
+router.push(url)            // always push
+router.replace(url)         // replace the current one
 router.back()               // pop
-router.dismiss(count?)      // dismiss el último del stack más cercano
-router.dismissTo(href)      // dismiss hasta href (router 4.0.8+)
-router.dismissAll()         // equivalente a popToTop
+router.dismiss(count?)      // dismiss the last from the nearest stack
+router.dismissTo(href)      // dismiss to href (router 4.0.8+)
+router.dismissAll()         // equivalent to popToTop
 router.canDismiss()         // boolean
-router.canGoBack()          // boolean (usado en modal web)
+router.canGoBack()          // boolean (used in web modal)
 ```
 
-### Custom `getId` para múltiples instancias del mismo screen
+### Custom `getId` for multiple instances of the same screen
 
 ```tsx
 <Stack.Screen name="[profile]" getId={({ params }) => String(Date.now())} />
@@ -263,10 +263,10 @@ router.canGoBack()          // boolean (usado en modal web)
 
 ## 6. URL parameters: local vs global
 
-- **Route parameters** (`[user].tsx`): parte del path; nunca nullish.
-- **Search parameters** (`?query=...`): opcionales.
-- `useLocalSearchParams()` → re-render solo cuando la URL del componente cambia. **(preferido)**
-- `useGlobalSearchParams()` → re-render en cada cambio de URL global; puede afectar performance.
+- **Route parameters** (`[user].tsx`): part of the path; never nullish.
+- **Search parameters** (`?query=...`): optional.
+- `useLocalSearchParams()` → re-render only when the component's URL changes. **(preferred)**
+- `useGlobalSearchParams()` → re-render on every global URL change; can affect performance.
 
 ```tsx
 // src/app/users/[id].tsx
@@ -287,9 +287,9 @@ export default UserScreen;
 const { '#': hash } = useLocalSearchParams<{ '#': string }>();
 ```
 
-**Parámetros reservados** (no usar): `screen`, `params`, `initial`, `state`.
+**Reserved parameters** (do not use): `screen`, `params`, `initial`, `state`.
 
-## 7. Modales
+## 7. Modals
 
 ```tsx
 // src/app/_layout.tsx
@@ -306,14 +306,14 @@ const RootLayout: FC<{}> = () => (
 export default RootLayout;
 ```
 
-**`presentation` opciones oficiales:**
+**Official `presentation` options:**
 - `card` (default)
 - `modal`
 - `transparentModal`
 - `containedModal` (iOS: `UIModalPresentationCurrentContext`)
 - `containedTransparentModal`
 - `fullScreenModal`
-- `formSheet` (detents configurables)
+- `formSheet` (configurable detents)
 
 > *"On Android, the modal slides on top… On iOS, the modal slides from the bottom… On web, the modal is presented as a separate route, and the dismiss behavior has to be provided manually using `router.canGoBack()`."*
 
@@ -335,7 +335,7 @@ export default RootLayout;
 
 > *"Android supports a maximum of 3 detents. iOS accepts any number of detents."*
 
-`fitToContents` sizing no permite `flex: 1`. A partir de SDK 55, `flex: 1` funciona en iOS con detents numéricos.
+`fitToContents` sizing does not allow `flex: 1`. Starting SDK 55, `flex: 1` works on iOS with numeric detents.
 
 ### Anchor (`unstable_settings`)
 
@@ -352,21 +352,21 @@ export const unstable_settings = { anchor: 'index' };
 { "expo": { "experiments": { "typedRoutes": true } } }
 ```
 
-Genera `expo-env.d.ts` (gitignored). Aporta autocomplete en `<Link>`, `useRouter`, `useLocalSearchParams`.
+Generates `expo-env.d.ts` (gitignored). Provides autocomplete in `<Link>`, `useRouter`, `useLocalSearchParams`.
 
 ```tsx
 ✅ <Link href="/about" />
 ✅ <Link href="/user/1" />
 ✅ <Link href={`/user/${id}`} />
 ✅ <Link href={{ pathname: "/user/[id]", params: { id: 1 } }} />
-❌ <Link href="/usser/1" />        // ruta inválida
-❌ <Link href="/user/[id]" />      // dinámico debe ser object
-❌ <Link href={{ pathname: "/user/[id]", params: { _id: 1 } }} />  // params con key inválida
+❌ <Link href="/usser/1" />        // invalid route
+❌ <Link href="/user/[id]" />      // dynamic must be object
+❌ <Link href={{ pathname: "/user/[id]", params: { _id: 1 } }} />  // params with invalid key
 ```
 
-**Rutas relativas no están soportadas en typed routes** — usar `useSegments()`.
+**Relative routes are not supported in typed routes** — use `useSegments()`.
 
-Tipos de query params (no se generan automáticamente):
+Query param types (not auto-generated):
 
 ```tsx
 const { query, profile, search } = useLocalSearchParams<
@@ -377,42 +377,42 @@ const { query, profile, search } = useLocalSearchParams<
 
 ## 9. Deep linking
 
-- **Deep links:** scheme propio, e.g. `myapp://users/evanbacon`
-- **Universal Links (iOS)** / **App Links (Android):** asociación con dominio https. Requieren domain verification files.
+- **Deep links:** own scheme, e.g. `myapp://users/evanbacon`
+- **Universal Links (iOS)** / **App Links (Android):** association with https domain. Require domain verification files.
 
 > *"To implement any of the above Linking strategies, we recommend using Expo Router since deep linking is automatically enabled for all of your app's screens."*
 
-Para custom intent linking (Android) → archivo `+native-intent.tsx`.
+For custom intent linking (Android) → `+native-intent.tsx` file.
 
 ## 10. Platform-specific modules
 
 - `Component.native.tsx` → Android/iOS
-- `Component.tsx` → todas (incl. web)
-- `Component.web.ts` → solo web
-- `Component.ios.tsx` → solo iOS
-- `Component.android.tsx` → solo Android
-- Mismo patrón aplica a CSS e imágenes (Metro resuelve por extensión).
+- `Component.tsx` → all (including web)
+- `Component.web.ts` → web only
+- `Component.ios.tsx` → iOS only
+- `Component.android.tsx` → Android only
+- Same pattern applies to CSS and images (Metro resolves by extension).
 
-## 11. Errores comunes
+## 11. Common errors
 
-| Problema | Solución oficial |
+| Problem | Official solution |
 |---|---|
-| Large title no colapsa al hacer scroll | El `ScrollView`/`FlatList` debe ser **primer hijo** del screen. Si necesita wrapper, `collapsable={false}` |
-| Flash blanco entre screens | Falta `ThemeProvider` en root layout |
-| iOS 26 "Liquid Glass" molestando | Opt-out con `UIDesignRequiresCompatibility=true` en `ios.infoPlist`, o usa `expo-router/js-stack` |
-| Rutas relativas con typed routes | No soportadas. Usa `useSegments()` para construir rutas dinámicas |
-| DOM component no recibe `usePathname()` | Léelo fuera y pásalo como prop |
-| `"react-native version mismatch"` | `npx expo install --check` o `npx expo-doctor@latest` |
-| Empty header en stack después de reiniciar | Falta `initialRouteName` en `unstable_settings` del layout del stack |
-| Cambios a `babel.config`/`metro.config` no aplican | `npx expo start --clear` |
+| Large title does not collapse on scroll | The `ScrollView`/`FlatList` must be the **first child** of the screen. If it needs a wrapper, `collapsable={false}` |
+| White flash between screens | Missing `ThemeProvider` in root layout |
+| iOS 26 "Liquid Glass" bothering | Opt-out with `UIDesignRequiresCompatibility=true` in `ios.infoPlist`, or use `expo-router/js-stack` |
+| Relative routes with typed routes | Not supported. Use `useSegments()` to build dynamic routes |
+| DOM component does not receive `usePathname()` | Read it outside and pass it as a prop |
+| `"react-native version mismatch"` | `npx expo install --check` or `npx expo-doctor@latest` |
+| Empty header in stack after restarting | Missing `initialRouteName` in the stack layout's `unstable_settings` |
+| Changes to `babel.config`/`metro.config` do not apply | `npx expo start --clear` |
 
-## 12. Cuándo usar React Navigation v7 en su lugar
+## 12. When to use React Navigation v7 instead
 
-- Necesitas control manual fino (custom transitions, gesture composition compleja, deep state machines de navegación).
-- No te importa web / deep linking universal.
-- Migras una app existente desde RN CLI (no Expo) que ya usa React Navigation.
+- You need fine manual control (custom transitions, complex gesture composition, navigation state machines).
+- You do not care about web / universal deep linking.
+- You migrate an existing app from RN CLI (not Expo) that already uses React Navigation.
 
-Snippet mínimo oficial v7 (Static API, recomendada):
+Official minimum v7 snippet (Static API, recommended):
 
 ```tsx
 import { FC } from 'react';
@@ -434,4 +434,4 @@ const Navigation: FC<{}> = () => {
 export default Navigation;
 ```
 
-Migración RN → expo-router tiene guía oficial paso a paso: https://docs.expo.dev/router/migrate/from-react-navigation/.
+RN → expo-router migration has an official step-by-step guide: https://docs.expo.dev/router/migrate/from-react-navigation/.

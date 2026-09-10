@@ -1,38 +1,38 @@
-# Setup inicial — Expo SDK 54+
+# Initial setup — Expo SDK 54+
 
-> **Fuentes oficiales:** https://docs.expo.dev/get-started/create-a-project/ · https://docs.expo.dev/get-started/start-developing/ · https://docs.expo.dev/workflow/configuration/ · https://docs.expo.dev/guides/typescript/ · https://docs.expo.dev/versions/latest/config/metro/ · https://docs.expo.dev/versions/latest/config/babel/
+> **Official sources:** https://docs.expo.dev/get-started/create-a-project/ · https://docs.expo.dev/get-started/start-developing/ · https://docs.expo.dev/workflow/configuration/ · https://docs.expo.dev/guides/typescript/ · https://docs.expo.dev/versions/latest/config/metro/ · https://docs.expo.dev/versions/latest/config/babel/
 >
-> **Antes de generar archivos:** lee `AGENTS.md` / `architecture.md` del proyecto. Si ya hay convenciones (estructura de carpetas, naming, imports), respítalas. Esta skill solo propone cuando el proyecto no define nada.
+> **Before generating files:** read `AGENTS.md` / `architecture.md` of the project. If conventions already exist (folder structure, naming, imports), respect them. This skill only proposes when the project does not define anything.
 
-## 1. Crear el proyecto
+## 1. Create the project
 
 ```sh
 npx create-expo-app@latest --template default
 ```
 
-> Cita oficial: *"During the SDK 57 transition period, `create-expo-app@latest` without the `--template` flag creates an SDK 54 project. If you plan to use Expo Go on a physical device, use an SDK 54 project."*
+> Official quote: *"During the SDK 57 transition period, `create-expo-app@latest` without the `--template` flag creates an SDK 54 project. If you plan to use Expo Go on a physical device, use an SDK 54 project."*
 
-Requisitos: Node.js LTS, npm/pnpm/yarn/bun. Funciona en macOS, Linux y Windows (Powershell + WSL 2).
+Requirements: Node.js LTS, npm/pnpm/yarn/bun. Works on macOS, Linux, and Windows (Powershell + WSL 2).
 
-Iniciar dev server:
+Start the dev server:
 
 ```sh
-npx expo start            # flags: --tunnel (LAN roto), --clear (limpia cache Metro)
-# en la CLI: a (Android), i (iOS), w (web)
+npx expo start            # flags: --tunnel (broken LAN), --clear (clears Metro cache)
+# in the CLI: a (Android), i (iOS), w (web)
 ```
 
-**Fast Refresh viene activado por default** (no requiere config).
+**Fast Refresh comes enabled by default** (no config required).
 
-## 2. Estructura de archivos canónica
+## 2. Canonical file structure
 
-La doc oficial de expo-router (`/router/basics/core-concepts/`) prescribe:
+The official expo-router docs (`/router/basics/core-concepts/`) prescribe:
 
 ```
 src
   app/
-    _layout.tsx        # Root layout: inicialización (fonts, splash, providers)
+    _layout.tsx        # Root layout: initialization (fonts, splash, providers)
     index.tsx          # /            initial route
-    (group)/           # Route group (NO aparece en URL)
+    (group)/           # Route group (does NOT appear in URL)
       settings.tsx     # /settings
     [param].tsx        # Dynamic route
     [...slug].tsx      # Catch-all
@@ -47,28 +47,28 @@ src
   assets/
     fonts/
     images/
-app.config.ts          # Raíz, junto a package.json
+app.config.ts          # Root, next to package.json
 package.json
 tsconfig.json
-metro.config.js         # Solo si necesitas customizar
-babel.config.js         # Solo si necesitas customizar
+metro.config.js         # Only if you need to customize
+babel.config.js         # Only if you need to customize
 ```
 
-**Reglas explícitas de la doc:**
-- **`src/app/` es exclusivamente para rutas y layouts.** Cualquier archivo aquí se interpreta como ruta.
-- **Componentes, hooks, utils** van en `src/components`, `src/hooks`, `src/constants`.
-- **Inicialización** (fonts, splash, providers) va en `src/app/_layout.tsx`.
-- **Kebab-case lowercase** para nombres de archivo (`text-field.tsx`, no `TextField.tsx`).
+**Explicit rules from the docs:**
+- **`src/app/` is exclusively for routes and layouts.** Any file here is interpreted as a route.
+- **Components, hooks, utils** go in `src/components`, `src/hooks`, `src/constants`.
+- **Initialization** (fonts, splash, providers) goes in `src/app/_layout.tsx`.
+- **Lowercase kebab-case** for file names (`text-field.tsx`, not `TextField.tsx`).
 
-> La doc oficial **NO prescribe** sub-estructura para `src/components/` (átomos/moléculas/etc.). Eso queda a criterio del design system.
+> The official docs **do not prescribe** a sub-structure for `src/components/` (atoms/molecules/etc.). That is up to the design system.
 
-> **Convención de código de esta skill:** componentes, screens y hooks se escriben como **arrow functions**. Helpers/utils/pure no-UI usan `function`.
+> **This skill's code convention:** components, screens, and hooks are written as **arrow functions**. Helpers/utils/pure non-UI use `function`.
 
 ## 3. `app.json` / `app.config.ts`
 
-Tres formas soportadas (en orden de precedencia): `app.json` (estático), `app.config.js` (dinámico), `app.config.ts` (TS). **Si hay conflicto, el `.ts` gana sobre `.js`.**
+Three supported forms (in order of precedence): `app.json` (static), `app.config.js` (dynamic), `app.config.ts` (TS). **If there is a conflict, the `.ts` wins over `.js`.**
 
-### Mínimo viable
+### Minimum viable
 
 ```json
 {
@@ -79,7 +79,7 @@ Tres formas soportadas (en orden de precedencia): `app.json` (estático), `app.c
 }
 ```
 
-### Con platforms + plugins + scheme
+### With platforms + plugins + scheme
 
 ```json
 {
@@ -117,13 +117,13 @@ Tres formas soportadas (en orden de precedencia): `app.json` (estático), `app.c
 }
 ```
 
-### `app.config.ts` (recomendado para types + lógica dinámica)
+### `app.config.ts` (recommended for types + dynamic logic)
 
 ```ts
 import 'tsx/cjs';
 import { ExpoConfig, ConfigContext } from 'expo/config';
 
-// helper puro (no UI) — usa function
+// pure helper (no UI) — uses function
 const buildConfig = ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   slug: 'my-app',
@@ -134,15 +134,15 @@ const buildConfig = ({ config }: ConfigContext): ExpoConfig => ({
 export default buildConfig;
 ```
 
-> **Caveat oficial:** `Constants.expoConfig` expone todo **excepto** `ios.config`, `android.config`, `updates.codeSigningCertificate`, `updates.codeSigningMetadata`. **No incluir secretos en `app.config`.**
+> **Official caveat:** `Constants.expoConfig` exposes everything **except** `ios.config`, `android.config`, `updates.codeSigningCertificate`, `updates.codeSigningMetadata`. **Do not include secrets in `app.config`.**
 
-### Variables de entorno
+### Environment variables
 
-Variables con prefijo `EXPO_PUBLIC_` se exponen al bundle del cliente (Metro las inyecta automáticamente). Para secretos, usa `eas env:create` y `process.env.X` solo en build time.
+Variables prefixed with `EXPO_PUBLIC_` are exposed to the client bundle (Metro injects them automatically). For secrets, use `eas env:create` and `process.env.X` only at build time.
 
 ## 4. TypeScript
 
-### `tsconfig.json` mínimo
+### Minimum `tsconfig.json`
 
 ```json
 {
@@ -165,7 +165,7 @@ Variables con prefijo `EXPO_PUBLIC_` se exponen al bundle del cliente (Metro las
 }
 ```
 
-> `tsconfigPaths` está habilitado por default (feature experimental). Deshabilitar con `"expo.experiments.tsconfigPaths": false`. **No soportado por `@expo/webpack-config`** (deprecated).
+> `tsconfigPaths` is enabled by default (experimental feature). Disable with `"expo.experiments.tsconfigPaths": false`. **Not supported by `@expo/webpack-config`** (deprecated).
 
 ### Type-safe routing (expo-router)
 
@@ -177,22 +177,22 @@ Variables con prefijo `EXPO_PUBLIC_` se exponen al bundle del cliente (Metro las
 }
 ```
 
-Genera `expo-env.d.ts` (debe ir en `.gitignore`). Aporta autocomplete en `<Link href>`, `useRouter`, `useLocalSearchParams`.
+Generates `expo-env.d.ts` (should be in `.gitignore`). Provides autocomplete in `<Link href>`, `useRouter`, `useLocalSearchParams`.
 
-### TS en archivos de config
+### TS in config files
 
 ```sh
 npx expo install tsx --dev
 ```
 
 ```js
-// metro.config.js (entry en JS, delega a TS)
+// metro.config.js (entry in JS, delegates to TS)
 require('tsx/cjs');
 module.exports = require('./metro.config.ts');
 ```
 
 ```ts
-// app.config.ts (NO requiere tsx — Expo CLI lo procesa)
+// app.config.ts (does NOT require tsx — Expo CLI processes it)
 import { ExpoConfig, ConfigContext } from 'expo/config';
 
 const config = ({ config }: ConfigContext): ExpoConfig => ({ ...config, slug: 'my-app' });
@@ -202,7 +202,7 @@ export default config;
 
 ## 5. Metro config
 
-Default mínimo (`metro.config.js`):
+Minimum default (`metro.config.js`):
 
 ```js
 const { getDefaultConfig } = require('expo/metro-config');
@@ -210,27 +210,27 @@ const config = getDefaultConfig(__dirname);
 module.exports = config;
 ```
 
-Hechos oficiales importantes:
-- **CSS support** está habilitado por default (incluyendo `.module.css`).
-- **Global CSS** debe importarse en el **root `_layout.tsx`** (cuando usas expo-router).
-- **`.env` files** se cargan automáticamente.
-- **On-demand filesystem** activo por default.
-- **ES Module resolution** (SDK 53+) usa `package.json:exports`.
+Important official facts:
+- **CSS support** is enabled by default (including `.module.css`).
+- **Global CSS** must be imported in the **root `_layout.tsx`** (when using expo-router).
+- **`.env` files** load automatically.
+- **On-demand filesystem** is active by default.
+- **ES Module resolution** (SDK 53+) uses `package.json:exports`.
 - **Magic import comment** (SDK 52+): `import(/* @metro-ignore */ './x.js')`.
 
-Tras modificar `metro.config.js` → `npx expo start --clear`.
+After modifying `metro.config.js` → `npx expo start --clear`.
 
 ## 6. Babel config
 
-**Babel se configura automáticamente vía `babel-preset-expo`.** No necesitas `babel.config.js` salvo personalización.
+**Babel is configured automatically via `babel-preset-expo`.** You do not need `babel.config.js` unless customizing.
 
-Para crearlo manualmente:
+To create it manually:
 
 ```sh
 npx expo customize babel.config.js
 ```
 
-Default generado:
+Default generated:
 
 ```js
 module.exports = function (api) {
@@ -239,15 +239,15 @@ module.exports = function (api) {
 };
 ```
 
-**Tras modificar `babel.config.js` → `npx expo start --clear`** (cache de Babel se invalida).
+**After modifying `babel.config.js` → `npx expo start --clear`** (Babel cache is invalidated).
 
 ## 7. ESLint + Prettier
 
 ```sh
-npx expo lint          # SDK 53+ instala deps + crea eslint.config.js
+npx expo lint          # SDK 53+ installs deps + creates eslint.config.js
 ```
 
-Flat config (recomendado, SDK 53+):
+Flat config (recommended, SDK 53+):
 
 ```js
 const { defineConfig } = require('eslint/config');
@@ -267,32 +267,32 @@ Legacy (SDK ≤52):
 { "eslintConfig": { "extends": ["expo", "prettier"] } }
 ```
 
-## 8. Comandos del día a día
+## 8. Day-to-day commands
 
-| Comando | Cuándo |
+| Command | When |
 |---|---|
-| `npx expo start` | Solo cambios JS/TS |
-| `npx expo run:android` / `run:ios` | Primer build, tras agregar lib nativa, o cambiar config plugin |
-| `npx expo prebuild` | Regenerar `android/` y `ios/` (CNG) |
-| `npx expo prebuild --clean` | Borrar y regenerar nativo |
-| `npx expo install <pkg>` | Instalar dependencia respetando versión del SDK |
-| `npx expo install --check` | Verificar versiones vs SDK |
-| `npx expo-doctor@latest` | Validar contra reactnative.directory |
-| `npx expo config --type public` | Inspeccionar config final mergeada |
+| `npx expo start` | JS/TS changes only |
+| `npx expo run:android` / `run:ios` | First build, after adding a native lib, or changing a config plugin |
+| `npx expo prebuild` | Regenerate `android/` and `ios/` (CNG) |
+| `npx expo prebuild --clean` | Delete and regenerate native |
+| `npx expo install <pkg>` | Install dependency respecting the SDK version |
+| `npx expo install --check` | Verify versions vs SDK |
+| `npx expo-doctor@latest` | Validate against reactnative.directory |
+| `npx expo config --type public` | Inspect final merged config |
 
-> **Errores comunes de LLMs** (lista oficial en `docs.expo.dev/llms.txt`):
-> - **`expo eject` no existe** desde SDK 46 (2022). Usa `expo prebuild`.
-> - **`expo-cli` global está deprecated.** Usa `npx expo`.
-> - **No hay "managed vs bare workflow".** Todos los proyectos usan la misma arquitectura (CNG).
+> **Common LLM errors** (official list at `docs.expo.dev/llms.txt`):
+> - **`expo eject` does not exist** since SDK 46 (2022). Use `expo prebuild`.
+> - **`expo-cli` global is deprecated.** Use `npx expo`.
+> - **There is no "managed vs bare workflow".** All projects use the same architecture (CNG).
 
-## 9. Convenciones de código de esta skill
+## 9. This skill's code conventions
 
-Cuando generes código nuevo (componentes, screens, hooks, providers):
+When you generate new code (components, screens, hooks, providers):
 
 ```tsx
 import { FC, useState } from 'react';
 
-// ✅ BIEN — componentes, screens y hooks como arrow functions con FC<Props>
+// ✅ GOOD — components, screens, and hooks as arrow functions with FC<Props>
 type HomeScreenProps = {
   userId: string;
   onPressItem?: (id: string) => void;
@@ -311,7 +311,7 @@ const HomeScreen: FC<HomeScreenProps> = ({ userId, onPressItem }) => {
 
 export default HomeScreen;
 
-// ✅ BIEN — hook custom como arrow function
+// ✅ GOOD — custom hook as arrow function
 type UseUserResult = { user: User | null; setUser: (u: User | null) => void };
 
 const useUser = (): UseUserResult => {
@@ -319,7 +319,7 @@ const useUser = (): UseUserResult => {
   return { user, setUser };
 };
 
-// ✅ BIEN — helpers puros no-UI como function tradicional
+// ✅ GOOD — pure non-UI helpers as traditional function
 function formatPrice(cents: number, currency: string = 'USD'): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
 }
@@ -328,7 +328,7 @@ function parseJwt(token: string): JwtPayload | null {
   // ...
 }
 
-// ✅ BIEN — funciones dentro de un componente también son arrow
+// ✅ GOOD — functions inside a component are also arrow
 type CheckoutScreenProps = {
   items: CartItem[];
 };
@@ -345,14 +345,14 @@ const CheckoutScreen: FC<CheckoutScreenProps> = ({ items }) => {
 export default CheckoutScreen;
 ```
 
-Reglas rápidas:
-| Caso | Sintaxis |
+Quick rules:
+| Case | Syntax |
 |---|---|
-| Componente / screen con props | `const X: FC<XProps> = (props) => { ... }` |
-| Componente sin props | `const X: FC<{}> = () => { ... }` |
-| Hook custom | `const useX = (...): UseXResult => { ... }` |
+| Component / screen with props | `const X: FC<XProps> = (props) => { ... }` |
+| Component without props | `const X: FC<{}> = () => { ... }` |
+| Custom hook | `const useX = (...): UseXResult => { ... }` |
 | Provider / Context | `const XProvider: FC<{ children: ReactNode }> = ({ children }) => { ... }` |
-| Método dentro de componente | `const handleX = () => { ... }` |
-| Handler inline | `onPress={() => ...}` |
-| Helper puro / util no-UI | `function formatX() { ... }` |
-| Validador puro / parser | `function parseJwt(token) { ... }` |
+| Method inside a component | `const handleX = () => { ... }` |
+| Inline handler | `onPress={() => ...}` |
+| Pure helper / non-UI util | `function formatX() { ... }` |
+| Pure validator / parser | `function parseJwt(token) { ... }` |

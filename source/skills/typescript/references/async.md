@@ -1,10 +1,10 @@
-# Async y Promise
+# Async and Promise
 
-> **Fuentes oficiales:** https://www.typescriptlang.org/docs/handbook/2/narrowing.html#the-unknown-type (useUnknownInCatchVariables) · https://typescript-eslint.io/rules/no-floating-promises/
+> **Official sources:** https://www.typescriptlang.org/docs/handbook/2/narrowing.html#the-unknown-type (useUnknownInCatchVariables) · https://typescript-eslint.io/rules/no-floating-promises/
 
 ## 1. Promise<T>
 
-Una función `async` siempre retorna `Promise<T>`. Si declarás `async function foo(): T` (sin `Promise<>`), TS da error.
+An `async` function always returns `Promise<T>`. If you declare `async function foo(): T` (without `Promise<>`), TS errors.
 
 ```ts
 async function fetchUser(): Promise<User> { /* ... */ }
@@ -13,7 +13,7 @@ async function fetchUser(): User { /* ❌ Error */ }
 
 ## 2. Awaited<T>
 
-`Awaited<T>` extrae el tipo resuelto de una `Promise` o `thenable`. Para `Promise<Promise<X>>`, desenvuelve recursivamente.
+`Awaited<T>` extracts the resolved type from a `Promise` or thenable. For `Promise<Promise<X>>`, it unwraps recursively.
 
 ```ts
 type P = Promise<string>;
@@ -23,7 +23,7 @@ type P2 = Promise<Promise<number>>;
 type N = Awaited<P2>; // number
 ```
 
-### Derivar el tipo de retorno de una función existente
+### Deriving the return type of an existing function
 
 ```ts
 async function fetchUser() { return { id: '1', name: 'Ana' }; }
@@ -41,7 +41,7 @@ type Orders = Awaited<ReturnType<typeof fetchOrders>>;
 
 ## 3. `no-floating-promises` (typescript-eslint)
 
-Esta regla atrapa promesas creadas pero nunca awaited/then'd/catch'd:
+This rule catches created but never awaited/then'd/catch'd promises:
 
 ```ts
 // ❌ Floating promise
@@ -53,15 +53,15 @@ function handler() {
   updateUser('1'); // ❌ Promise ignored
 }
 
-// ✅ BIEN — explícito
+// ✅ GOOD — explicit
 function handler() {
-  void updateUser('1'); // descarta el resultado a propósito
-  // o
+  void updateUser('1'); // discard the result on purpose
+  // or
   updateUser('1').catch(err => console.error(err));
 }
 ```
 
-Activar en `eslint.config.js`:
+Enable in `eslint.config.js`:
 
 ```js
 {
@@ -73,28 +73,28 @@ Activar en `eslint.config.js`:
 
 ## 4. `await-thenable`
 
-`await` solo funciona sobre `Promise` o `thenable`. Esta regla lo enforce:
+`await` only works over `Promise` or thenable. This rule enforces it:
 
 ```ts
-// ❌ await sobre algo que no es Promise
+// ❌ await over something that is not Promise
 const value = 42;
 const result = await value; // ❌ Error
 ```
 
 ## 5. `no-misused-promises`
 
-Previene pasar `Promise` donde se espera valor (o viceversa):
+Prevents passing `Promise` where a value is expected (or vice versa):
 
 ```ts
-// ❌ Pasar Promise donde se espera valor
+// ❌ Passing Promise where a value is expected
 const handleClick = (handler: () => void) => { /* ... */ };
 button.addEventListener('click', async () => { /* ... */ });
-// ❌ handler espera () => void, recibe () => Promise<void>
+// ❌ handler expects () => void, receives () => Promise<void>
 ```
 
-## 6. `try/catch` con `unknown`
+## 6. `try/catch` with `unknown`
 
-Con `useUnknownInCatchVariables: true` (parte de `strict`), `catch (e)` da `e: unknown`. Narrow antes de usar:
+With `useUnknownInCatchVariables: true` (part of `strict`), `catch (e)` gives `e: unknown`. Narrow before use:
 
 ```ts
 try {
@@ -113,14 +113,14 @@ try {
 }
 ```
 
-> ⚠️ **No uses `any` para `e`** — eso desactiva el checker y es exactamente lo que `unknown` está para resolver.
+> ⚠️ **Do not use `any` for `e`** — that disables the checker and is exactly what `unknown` is for.
 
 ## 7. `Promise.allSettled` vs `Promise.all`
 
-| Función | Si una falla | Retorna |
+| Function | If one fails | Returns |
 |---|---|---|
-| `Promise.all` | Rechaza con el primer error | `T[]` |
-| `Promise.allSettled` | Continúa | `{ status: 'fulfilled', value: T } \| { status: 'rejected', reason: unknown }[]` |
+| `Promise.all` | Rejects with the first error | `T[]` |
+| `Promise.allSettled` | Continues | `{ status: 'fulfilled', value: T } \| { status: 'rejected', reason: unknown }[]` |
 
 ```ts
 const results = await Promise.allSettled([
@@ -139,22 +139,22 @@ const failed = results
 
 ## 8. Top-level await (ESM)
 
-En módulos ESM (`"type": "module"` o `module: "NodeNext"`/`"ESNext"`), podés usar `await` a nivel de módulo:
+In ESM modules (`"type": "module"` or `module: "NodeNext"`/`"ESNext"`), you can use `await` at the module level:
 
 ```ts
 // config.ts
-const config = await loadConfig(); // OK en top-level ESM
+const config = await loadConfig(); // OK at top-level ESM
 export { config };
 ```
 
-En CommonJS no funciona. Para Node < 14 tampoco.
+In CommonJS it does not work. Nor for Node < 14.
 
-## 9. Errores comunes
+## 9. Common errors
 
-| Error | Causa | Solución |
+| Error | Cause | Solution |
 |---|---|---|
-| `await is only valid in async functions` | Falta `async` en la función | Agrega `async` antes de la declaración |
-| `Property 'X' does not exist on type 'Promise<Y>'` | Olvidaste `await` | Agrega `await` o usa `.then()` |
-| `await Promise.resolve()` funciona pero `await 42` falla | `await` solo sobre thenable | Normal, agregá `async` o devolvé `Promise.resolve(value)` |
-| `no-floating-promises` se queja en event handler | Pasaste `async` directamente | Usa `void` o `.catch()` explícito |
-| `catch (e)` da `unknown` | `useUnknownInCatchVariables` activo | Narrow con `instanceof Error` |
+| `await is only valid in async functions` | Missing `async` on the function | Add `async` before the declaration |
+| `Property 'X' does not exist on type 'Promise<Y>'` | You forgot `await` | Add `await` or use `.then()` |
+| `await Promise.resolve()` works but `await 42` fails | `await` only over thenable | Normal, add `async` or return `Promise.resolve(value)` |
+| `no-floating-promises` complains on event handler | You passed `async` directly | Use `void` or explicit `.catch()` |
+| `catch (e)` gives `unknown` | `useUnknownInCatchVariables` active | Narrow with `instanceof Error` |

@@ -1,12 +1,12 @@
-# Devices — enumeración, selección, y troubleshooting de conexión
+# Devices — enumeration, selection, and connection troubleshooting
 
-## Listar devices
+## List devices
 
 ```bash
 adb devices -l
 ```
 
-Salida típica:
+Typical output:
 
 ```
 emulator-5554          device  usb:1-1 product:sdk_gphone64_x86_64
@@ -14,87 +14,87 @@ RF8M40ABCDE            device  usb:3-2 product:sm_a536e transport_id:2
 192.168.1.42:5555      device  product:coral transport_id:4
 ```
 
-- `device` = listo. `unauthorized` = falta aceptar el diálogo de USB en el device. `offline` = no responde.
-- `-l` añade columnas de producto/modelo, clave para distinguir dos devices con el mismo `serial` corto.
+- `device` = ready. `unauthorized` = the USB dialog still needs to be accepted on the device. `offline` = no response.
+- `-l` adds product/model columns, key to distinguish two devices with the same short `serial`.
 
-## Seleccionar device con `-s`
+## Select device with `-s`
 
-Cuando hay 2+ devices **siempre** especifica serial:
+When there are 2+ devices **always** specify the serial:
 
 ```bash
 adb -s emulator-5554 install ...
 adb -s RF8M40ABCDE logcat -c
 ```
 
-Si ejecutas sin `-s` con varios devices, adb avisa `more than one device/emulator` y **rechaza el comando**. Excepción: `adb -d` (device físico) o `adb -e` (emulator) cuando solo hay uno de cada tipo.
+If you run without `-s` with multiple devices, adb warns `more than one device/emulator` and **rejects the command**. Exception: `adb -d` (physical device) or `adb -e` (emulator) when there is only one of each type.
 
-## Wi-Fi ADB (sin USB)
+## Wi-Fi ADB (without USB)
 
-Útil cuando el device está cradleado o solo tienes red.
+Useful when the device is cradled or you only have network.
 
-Device físico (Android 11+ vía QR en developer options):
+Physical device (Android 11+ via QR in developer options):
 ```bash
-# 1. En el device: Settings > Developer options > Wireless debugging
-# 2. Anota IP y puerto (e.g., 192.168.1.42:39555)
-adb pair 192.168.1.42:39555   # te pedirá el código de 6 dígitos
+# 1. On the device: Settings > Developer options > Wireless debugging
+# 2. Note IP and port (e.g., 192.168.1.42:39555)
+adb pair 192.168.1.42:39555   # it will ask for the 6-digit code
 adb connect 192.168.1.42:39555
 ```
 
-Emulator (siempre en localhost):
+Emulator (always on localhost):
 ```bash
-# El AVD aparece como emulator-5554 después de lanzarlo desde Android Studio
-# o `emulator -avd <name>`
+# The AVD appears as emulator-5554 after launching it from Android Studio
+# or `emulator -avd <name>`
 ```
 
-Después de conectar por Wi-Fi, `adb devices` los lista igual.
+After connecting over Wi-Fi, `adb devices` lists them the same way.
 
 ## Troubleshooting
 
 ### "device unauthorized"
-El diálogo RSA fingerprint debe aceptarse en el device. Soluciones:
-1. Desconecta USB, vuelve a conectar.
-2. En el device: `adb kill-server && adb start-server` no ayuda — pero `Settings > Developer options > Revoke USB debugging authorizations` + reconectar sí.
-3. En macOS: reinicia `adb` y verifica que `~/.android/adbkey` y `adbkey.pub` existan.
+The RSA fingerprint dialog must be accepted on the device. Solutions:
+1. Disconnect USB, reconnect.
+2. On the device: `adb kill-server && adb start-server` does not help — but `Settings > Developer options > Revoke USB debugging authorizations` + reconnect does.
+3. On macOS: restart `adb` and verify that `~/.android/adbkey` and `adbkey.pub` exist.
 
 ### "offline"
-Cable malo, o device en sleep. Despertar con `adb shell input keyevent KEYCODE_WAKEUP` después de conectar.
+Bad cable, or device asleep. Wake with `adb shell input keyevent KEYCODE_WAKEUP` after connecting.
 
 ### "no permissions"
-Falta udev rules en Linux. No aplica en macOS.
+Missing udev rules on Linux. Does not apply on macOS.
 
-### "kex error" o "connection reset"
-El daemon de adb tiene estado stale:
+### "kex error" or "connection reset"
+The adb daemon has stale state:
 ```bash
 adb kill-server
 adb start-server
 adb devices
 ```
 
-Si vuelve a fallar, verifica que el puerto 5037 esté libre:
+If it fails again, verify that port 5037 is free:
 ```bash
 lsof -i :5037
 ```
 
-## Emulators vs devices físicos
+## Emulators vs physical devices
 
-| Cosa | Emulator | Físico |
+| Thing | Emulator | Physical |
 |---|---|---|
-| Cámara | Imágenes estáticas / webcam | Real |
-| GPS | Mock location | Real (con `adb emu geo fix ...`) |
-| Sensores | Simulados | Reales |
-| Performance | Lento, especialmente x86 | Real |
-| Loopback al host | `10.0.2.2` | `adb reverse` |
-| DB extractable | Sí (debug) | Sí (debug) |
-| Resolución | Configurable | Fija |
+| Camera | Static images / webcam | Real |
+| GPS | Mock location | Real (with `adb emu geo fix ...`) |
+| Sensors | Simulated | Real |
+| Performance | Slow, especially x86 | Real |
+| Loopback to host | `10.0.2.2` | `adb reverse` |
+| DB extractable | Yes (debug) | Yes (debug) |
+| Resolution | Configurable | Fixed |
 
-**Regla de smoke:** pasa en ambos antes de cada release. El emulador atrapa regresiones lógicas; el físico atrapa regressions de performance, battery y permisos.
+**Smoke rule:** run on both before each release. The emulator catches logical regressions; the physical one catches performance, battery, and permissions regressions.
 
-## Múltiples AVDs simultáneos
+## Multiple simultaneous AVDs
 
 ```bash
 emulator -avd Pixel_6_API_34 -port 5554 &
 emulator -avd Pixel_4_API_30 -port 5556 &
-adb devices   # ambos listados
+adb devices   # both listed
 ```
 
-Útil para matrix testing pero no abuses: cada AVD come ~2GB RAM.
+Useful for matrix testing but do not abuse it: each AVD eats ~2GB RAM.

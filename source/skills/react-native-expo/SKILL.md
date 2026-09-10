@@ -4,17 +4,17 @@ description: Reference guide for React Native + Expo SDK 54+ best practices (rou
 disable-model-invocation: true
 ---
 
-# React Native + Expo — Skill de buenas prácticas
+# React Native + Expo — Best practices skill
 
-> **Versión objetivo:** Expo SDK 54+ (estable). Todo el contenido está verificado contra `docs.expo.dev`, `reactnative.dev`, `tanstack.com`, `react-hook-form.com`, `shopify.github.io/flash-list`, `docs.swmansion.com/react-native-reanimated`.
+> **Target version:** Expo SDK 54+ (stable). All content is verified against `docs.expo.dev`, `reactnative.dev`, `tanstack.com`, `react-hook-form.com`, `shopify.github.io/flash-list`, `docs.swmansion.com/react-native-reanimated`.
 >
-> **Cómo se activa:** Solo cuando el usuario la pida explícitamente o esté en un proyecto React Native + Expo y haga una pregunta arquitectónica. Esta skill NO se auto-dispara desde menciones genéricas de "app", "formulario" o "scaffold".
+> **How it is activated:** Only when the user explicitly asks for it or is in a React Native + Expo project and makes an architectural question. This skill does NOT auto-trigger from generic mentions of "app", "form" or "scaffold".
 
-## Convenciones que esta skill impone (y dónde cede)
+## Conventions this skill enforces (and where it yields)
 
-1. **Arrow functions por defecto en código UI.** Componentes, screens, hooks y métodos dentro de componentes se escriben con arrow functions: `const Screen = () => { ... }`. `function` se reserva para **helpers, utils, o funciones puras no relacionadas a UI** (p.ej. un validador puro, una función de transformación de datos en un módulo `lib/`, un `parseJwt` en un repository). Esta regla aplica a TODO código que esta skill genere como ejemplo o recomendación.
+1. **Arrow functions by default in UI code.** Components, screens, hooks, and methods within components are written with arrow functions: `const Screen = () => { ... }`. `function` is reserved for **helpers, utils, or pure functions unrelated to UI** (e.g., a pure validator, a data transformation function in a `lib/` module, a `parseJwt` in a repository). This rule applies to ALL code this skill generates as example or recommendation.
 
-1b. **Props tipadas con `FC<Props>`.** Todo componente/screen/hook que reciba props las tipa con `FC<Props>` (alias de `React.FunctionComponent`) o `FC<Props, State>` si usa state interno. Definir el type de las props **antes** del componente y referenciarlo en `FC<...>`. Forma canónica:
+1b. **Props typed with `FC<Props>`.** Every component/screen/hook that receives props types them with `FC<Props>` (alias of `React.FunctionComponent`) or `FC<Props, State>` if it uses internal state. Define the props type **before** the component and reference it in `FC<...>`. Canonical form:
    ```tsx
    type HomeScreenProps = {
      userId: string;
@@ -27,100 +27,100 @@ disable-model-invocation: true
 
    export default HomeScreen;
    ```
-   Si el componente no recibe props, usar `FC<{}>` o simplemente no anotar (no infiere `JSX.Element | null` automáticamente).
+   If the component does not receive props, use `FC<{}>` or simply do not annotate (does not infer `JSX.Element | null` automatically).
 
-2. **La arquitectura del proyecto gana sobre los defaults de esta skill.** Antes de proponer una estructura de carpetas, naming, o patrón, leer `AGENTS.md`, `architecture.md`, `.context/*`, o el `README.md` del proyecto. Si el proyecto ya define convenciones (p.ej. `app/` vs `src/app/`, atoms/molecules/organisms vs flat, módulos por feature vs por capa, etc.), **esos mandan**. Esta skill solo aporta cuando el proyecto no tiene una convención explícita.
+2. **The project's architecture wins over this skill's defaults.** Before proposing a folder structure, naming, or pattern, read `AGENTS.md`, `architecture.md`, `.context/*`, or the project's `README.md`. If the project already defines conventions (e.g., `app/` vs `src/app/`, atoms/molecules/organisms vs flat, modules by feature vs by layer, etc.), **those win**. This skill only contributes when the project does not have an explicit convention.
 
-3. **Formularios: validación nativa de RHF por defecto.** Usar las reglas built-in de `react-hook-form` (`rules={{ required, minLength, pattern, validate }}`) o un resolver solo si el usuario lo pide explícitamente. **No proponer Zod, Valibot o Yup por defecto.** Si el usuario pide schema validation o el proyecto ya usa uno, sí intégralo (Zod/Valibot/Yup son las opciones oficiales soportadas por `@hookform/resolvers`).
+3. **Forms: native RHF validation by default.** Use `react-hook-form` built-in rules (`rules={{ required, minLength, pattern, validate }}`) or a resolver only if the user explicitly asks. **Do not propose Zod, Valibot, or Yup by default.** If the user asks for schema validation or the project already uses one, integrate it (Zod/Valibot/Yup are the official options supported by `@hookform/resolvers`).
 
-4. **Recomendación oficial > preferencia personal.** Si Expo/React/Shopify/SwMansion publican una guía, esa es la fuente. Si una práctica contradice "lo que se hacía antes", gana la doc actual.
+4. **Official recommendation > personal preference.** If Expo/React/Shopify/SwMansion publish a guide, that is the source. If a practice contradicts "what we used to do", the current docs win.
 
-5. **`expo-router` para apps nuevas, React Navigation para legacy.** El default template de `create-expo-app` usa expo-router. Migrar desde React Navigation tiene guía oficial; al revés no.
+5. **`expo-router` for new apps, React Navigation for legacy.** The default `create-expo-app` template uses expo-router. Migrating from React Navigation has an official guide; the reverse does not.
 
-6. **Server state ≠ client state ≠ form state ≠ UI state.** Cada categoría tiene su herramienta canónica. Mezclar lleva a re-renders innecesarios, bugs de cache, código espagueti.
+6. **Server state ≠ client state ≠ form state ≠ UI state.** Each category has its canonical tool. Mixing leads to unnecessary re-renders, cache bugs, spaghetti code.
 
-7. **Secretos a `expo-secure-store`, nunca AsyncStorage.** Es regla explícita de la guía oficial de Auth de Expo.
+7. **Secrets to `expo-secure-store`, never AsyncStorage.** It is an explicit rule of the official Expo Auth guide.
 
-8. **Permisos nativos siempre con el hook `use*Permissions` del módulo.** El paquete `expo-permissions` no existe desde SDK 48.
+8. **Native permissions always with the `use*Permissions` hook from the module.** The `expo-permissions` package does not exist since SDK 48.
 
-9. **Performance se mide en release builds, no en dev.** `console.log`, dev tools y JS thread saturado distorsionan cualquier benchmark.
+9. **Performance is measured in release builds, not in dev.** `console.log`, dev tools, and saturated JS thread distort any benchmark.
 
-10. **Customizar nativo vía config plugins, nunca editando `android/`/`ios/` a mano.** Se pierde con `expo prebuild --clean`.
+10. **Customize native via config plugins, never editing `android/`/`ios/` by hand.** It is lost with `expo prebuild --clean`.
 
-11. **Antes de instalar una librería, verificar en [reactnative.directory](https://reactnative.directory/) con `npx expo-doctor@latest`.** Especialmente crítico en New Architecture (SDK 53+ default).
+11. **Before installing a library, verify in [reactnative.directory](https://reactnative.directory/) with `npx expo-doctor@latest`.** Especially critical in New Architecture (SDK 53+ default).
 
-## Tabla de contenidos
+## Table of contents
 
-| Archivo | Cubre |
+| File | Covers |
 |---|---|
-| [`references/setup.md`](references/setup.md) | `create-expo-app`, estructura `src/`, `app.json`/`app.config.ts`, Metro/Babel, TypeScript, path aliases |
+| [`references/setup.md`](references/setup.md) | `create-expo-app`, `src/` structure, `app.json`/`app.config.ts`, Metro/Babel, TypeScript, path aliases |
 | [`references/router.md`](references/router.md) | `expo-router` (file-based routing, layouts, modals, typed routes, deep linking, params) |
-| [`references/state-and-data.md`](references/state-and-data.md) | TanStack Query, estado cliente, formularios (RHF + opt-in schema), storage local, DB, HTTP, auth |
-| [`references/native-features.md`](references/native-features.md) | Cámara, location, notificaciones, permisos (patrón unificado `use*Permissions`) |
-| [`references/performance.md`](references/performance.md) | Listas (FlashList vs FlatList), `expo-image`, Reanimated, New Architecture |
+| [`references/state-and-data.md`](references/state-and-data.md) | TanStack Query, client state, forms (RHF + opt-in schema), local storage, DB, HTTP, auth |
+| [`references/native-features.md`](references/native-features.md) | Camera, location, notifications, permissions (unified `use*Permissions` pattern) |
+| [`references/performance.md`](references/performance.md) | Lists (FlashList vs FlatList), `expo-image`, Reanimated, New Architecture |
 | [`references/deployment.md`](references/deployment.md) | EAS Build/Submit/Update/Workflows, testing (Jest, RNTL, Maestro), lint, debugging |
 
-## Decisiones rápidas por categoría
+## Quick decisions by category
 
-### ¿Cómo arranco un proyecto?
+### How do I start a project?
 
 ```
 npx create-expo-app@latest --template default
-# (SDK 54 mientras esté vigente el branch)
-# Estructura canónica: src/app/* (rutas) + src/components, src/hooks, src/constants
-# Config: app.config.ts (no app.json) si necesitas types/auto-completion
+# (SDK 54 while it is the current branch)
+# Canonical structure: src/app/* (routes) + src/components, src/hooks, src/constants
+# Config: app.config.ts (not app.json) if you need types/auto-completion
 ```
 
-> **Antes de generar archivos, leer `AGENTS.md` / `architecture.md` del proyecto** (regla 2 arriba). Si el proyecto define su propia estructura, replicarla.
+> **Before generating files, read `AGENTS.md` / `architecture.md` of the project** (rule 2 above). If the project defines its own structure, replicate it.
 
-Ver [`references/setup.md`](references/setup.md).
+See [`references/setup.md`](references/setup.md).
 
-### ¿Cómo navego?
+### How do I navigate?
 
-- **Default:** `expo-router` con file-based routing en `src/app/`. Deep linking automático.
-- **Alternativa:** `@react-navigation/native-stack` + `@react-navigation/bottom-tabs` (v7) — solo si necesitas control manual fino o no quieres deep linking universal.
-- **Tipado de rutas:** `experiments.typedRoutes: true` en `app.json`.
+- **Default:** `expo-router` with file-based routing in `src/app/`. Automatic deep linking.
+- **Alternative:** `@react-navigation/native-stack` + `@react-navigation/bottom-tabs` (v7) — only if you need fine manual control or do not want universal deep linking.
+- **Route typing:** `experiments.typedRoutes: true` in `app.json`.
 
-Ver [`references/router.md`](references/router.md).
+See [`references/router.md`](references/router.md).
 
-### ¿Cómo manejo estado?
+### How do I handle state?
 
-| Necesidad | Herramienta canónica |
+| Need | Canonical tool |
 |---|---|
-| Dato que viene del servidor | `@tanstack/react-query` v5 |
-| Estado UI compartido (1-2 valores, cambia poco) | React Context API |
-| Estado cliente global, muchos updates | `zustand` (consenso comunidad, sin pronunciamiento oficial) |
-| Formulario con validación | `react-hook-form` — **validación nativa por defecto**, schema validation solo si el usuario lo pide |
+| Data that comes from the server | `@tanstack/react-query` v5 |
+| Shared UI state (1-2 values, changes little) | React Context API |
+| Global client state, many updates | `zustand` (community consensus, no official pronouncement) |
+| Form with validation | `react-hook-form` — **native validation by default**, schema validation only if the user asks |
 
-> Expo no prescribe librería de client state. React oficial recomienda `useState`+`useReducer`+`Context` para lo que no es server state.
+> Expo does not prescribe a client state library. React official recommends `useState`+`useReducer`+`Context` for what is not server state.
 
-Ver [`references/state-and-data.md`](references/state-and-data.md).
+See [`references/state-and-data.md`](references/state-and-data.md).
 
-### ¿Cómo persisto datos?
+### How do I persist data?
 
-| Necesidad | Herramienta |
+| Need | Tool |
 |---|---|
-| Tokens, refresh tokens, secretos | `expo-secure-store` |
-| Preferencias, drafts, flags UI | `@react-native-async-storage/async-storage` o `react-native-mmkv` (sync, ~30× más rápido; requiere `expo prebuild`) |
-| Datos relacionales, queries, joins | `expo-sqlite` + `drizzle-orm` |
-| DB reactiva con sync engine | WatermelonDB (RN-only, overkill si solo es CRUD local) |
+| Tokens, refresh tokens, secrets | `expo-secure-store` |
+| Preferences, drafts, UI flags | `@react-native-async-storage/async-storage` or `react-native-mmkv` (sync, ~30× faster; requires `expo prebuild`) |
+| Relational data, queries, joins | `expo-sqlite` + `drizzle-orm` |
+| Reactive DB with sync engine | WatermelonDB (RN-only, overkill if it is just local CRUD) |
 
-Ver [`references/state-and-data.md`](references/state-and-data.md).
+See [`references/state-and-data.md`](references/state-and-data.md).
 
-### ¿Cómo autentico?
+### How do I authenticate?
 
-- **OAuth/OIDC genérico** (GitHub, Okta, Auth0): `expo-auth-session` + `expo-crypto`.
-- **Sign in with Apple** (iOS): `expo-apple-authentication` — **obligatorio** si tienes otros providers third-party (App Store rule).
-- **Google**: `@react-native-google-signin/google-signin` (pago para Credential Manager) o `react-native-nitro-google-signin` (gratis).
-- **Tokens:** siempre `expo-secure-store`.
+- **Generic OAuth/OIDC** (GitHub, Okta, Auth0): `expo-auth-session` + `expo-crypto`.
+- **Sign in with Apple** (iOS): `expo-apple-authentication` — **mandatory** if you have other third-party providers (App Store rule).
+- **Google**: `@react-native-google-signin/google-signin` (paid for Credential Manager) or `react-native-nitro-google-signin` (free).
+- **Tokens:** always `expo-secure-store`.
 
-> OAuth Nativo + Google Sign-In requieren **Development Build** (no Expo Go).
+> Native OAuth + Google Sign-In require **Development Build** (not Expo Go).
 
-Ver [`references/state-and-data.md`](references/state-and-data.md) §Auth.
+See [`references/state-and-data.md`](references/state-and-data.md) §Auth.
 
-### ¿Cómo accedo a features nativas?
+### How do I access native features?
 
-**Patrón universal de permisos** (todos los módulos `expo-*` lo siguen):
+**Universal permissions pattern** (all `expo-*` modules follow it):
 
 ```tsx
 const [permission, requestPermission] = useXxxPermissions();
@@ -132,88 +132,88 @@ if (!permission.granted) {
   }
   return <Button title="Open Settings" onPress={() => Linking.openURL('app-settings:')} />;
 }
-// usar feature...
+// use feature...
 ```
 
-Ver [`references/native-features.md`](references/native-features.md).
+See [`references/native-features.md`](references/native-features.md).
 
-### ¿Cómo optimizo performance?
+### How do I optimize performance?
 
-- **Listas > 50 items o longitud variable:** `@shopify/flash-list` v2 (New Arch). `FlatList` solo si conoces `getItemLayout` y la lista es homogénea.
-- **Imágenes:** `expo-image` (no `<Image>` de RN). BlurHash placeholder + `contentFit` + `recyclingKey` en listas.
-- **Animaciones:** `react-native-reanimated` v4 (requiere New Arch). Worklets plugin debe ir **último** en babel.
-- **Debug:** Chrome DevTools + React DevTools + `expo-dev-client`. **No usar Flipper** (deprecado por RN core).
+- **Lists > 50 items or variable length:** `@shopify/flash-list` v2 (New Arch). `FlatList` only if you know `getItemLayout` and the list is homogeneous.
+- **Images:** `expo-image` (not RN's `<Image>`). BlurHash placeholder + `contentFit` + `recyclingKey` in lists.
+- **Animations:** `react-native-reanimated` v4 (requires New Arch). Worklets plugin must go **last** in babel.
+- **Debug:** Chrome DevTools + React DevTools + `expo-dev-client`. **Do not use Flipper** (deprecated by RN core).
 
-Ver [`references/performance.md`](references/performance.md).
+See [`references/performance.md`](references/performance.md).
 
-### ¿Cómo despliego?
+### How do I deploy?
 
-- **Build:** `eas build --profile production` (cloud) o `eas build --local`.
-- **Submit:** `eas submit` (auto-firma y sube a stores).
-- **OTA updates:** `expo-updates` + `eas update --branch production`. **NO** cambia native code, permissions ni SDK.
-- **CI/CD:** EAS Workflows (`.eas/workflows/*.yml`) — corre en infraestructura managed. Alternativa: GitHub Actions.
-- **Local dev:** `npx expo run:android` / `run:ios` (compila nativo + Metro). Solo JS: `npx expo start`.
+- **Build:** `eas build --profile production` (cloud) or `eas build --local`.
+- **Submit:** `eas submit` (auto-signs and uploads to stores).
+- **OTA updates:** `expo-updates` + `eas update --branch production`. **Does NOT** change native code, permissions, or SDK.
+- **CI/CD:** EAS Workflows (`.eas/workflows/*.yml`) — runs on managed infrastructure. Alternative: GitHub Actions.
+- **Local dev:** `npx expo run:android` / `run:ios` (compiles native + Metro). JS only: `npx expo start`.
 
-Ver [`references/deployment.md`](references/deployment.md).
+See [`references/deployment.md`](references/deployment.md).
 
-### ¿Cómo testeo?
+### How do I test?
 
-- **Unit/component:** `jest-expo` preset + `@testing-library/react-native`. **No** `react-test-renderer` (deprecado en React 19+).
-- **E2E (oficial recomendado):** **Maestro** (mobile.dev). Expo tiene job type `maestro` en EAS Workflows.
-- **No oficial:** Detox (Expo no lo recomienda en su doc actual).
+- **Unit/component:** `jest-expo` preset + `@testing-library/react-native`. **Not** `react-test-renderer` (deprecated in React 19+).
+- **E2E (officially recommended):** **Maestro** (mobile.dev). Expo has a `maestro` job type in EAS Workflows.
+- **Not official:** Detox (Expo does not recommend it in its current docs).
 
-Ver [`references/deployment.md`](references/deployment.md) §Testing.
+See [`references/deployment.md`](references/deployment.md) §Testing.
 
-## Errores comunes que esta skill busca evitar
+## Common errors this skill aims to prevent
 
-| ❌ Anti-patrón | ✅ Lo correcto | Fuente |
+| ❌ Anti-pattern | ✅ Correct | Source |
 |---|---|---|
-| Guardar tokens en AsyncStorage | `expo-secure-store` | [docs.expo.dev/guides/authentication](https://docs.expo.dev/guides/authentication/) |
-| Editar `android/`/`ios/` a mano | Config plugin + `expo prebuild` | [docs.expo.dev/config-plugins](https://docs.expo.dev/config-plugins/introduction/) |
-| Editar `babel.config.js` para cosas que el preset ya hace | Solo crear `babel.config.js` si necesitas customización real; `npx expo customize babel.config.js` | [docs.expo.dev/versions/latest/config/babel](https://docs.expo.dev/versions/latest/config/babel/) |
-| `eject` de Expo | **`expo eject` no existe desde SDK 46.** Usar `expo prebuild` | [docs.expo.dev/llms.txt](https://docs.expo.dev/llms.txt) |
-| Usar `useAnimatedGestureHandler` | Gesture API v2 de Gesture Handler | [Reanimated 3→4 migration](https://docs.swmansion.com/react-native-reanimated/docs/guides/migration-from-3.x) |
-| Reanimated 3 con New Arch cuando hay 4 disponible | Reanimated 4 | [Reanimated docs](https://docs.swmansion.com/react-native-reanimated/) |
-| Asumir que `requestBackgroundPermissionsAsync` va a mostrar dialog en iOS "Allow Once" | Silenciosamente falla | [docs.expo.dev/versions/latest/sdk/location](https://docs.expo.dev/versions/latest/sdk/location/) |
-| `getExpoPushTokenAsync` antes de `setNotificationChannelAsync` en Android 13+ | Crear canal primero | [docs.expo.dev/versions/latest/sdk/notifications](https://docs.expo.dev/versions/latest/sdk/notifications/) |
-| Path alias `@/*` sin `tsconfigPaths` enabled | Habilitarlo o Metro no resuelve | [docs.expo.dev/guides/typescript](https://docs.expo.dev/guides/typescript/) |
-| `console.log` en producción | `babel-plugin-transform-remove-console` | [reactnative.dev/docs/performance](https://reactnative.dev/docs/performance) |
-| **`function Componente() { ... }`** | **`const Componente = () => { ... }`** | Convención de esta skill (regla 1) |
-| **Proponer Zod sin que el usuario lo pida** | **`rules={{ required, minLength, pattern, validate }}` built-in de RHF** | Convención de esta skill (regla 3) |
-| Inventar convenciones ignorando `AGENTS.md`/`architecture.md` | Leerlos primero; replicar lo que definen | Convención de esta skill (regla 2) |
+| Save tokens in AsyncStorage | `expo-secure-store` | [docs.expo.dev/guides/authentication](https://docs.expo.dev/guides/authentication/) |
+| Edit `android/`/`ios/` by hand | Config plugin + `expo prebuild` | [docs.expo.dev/config-plugins](https://docs.expo.dev/config-plugins/introduction/) |
+| Edit `babel.config.js` for things the preset already does | Only create `babel.config.js` if you need real customization; `npx expo customize babel.config.js` | [docs.expo.dev/versions/latest/config/babel](https://docs.expo.dev/versions/latest/config/babel/) |
+| `eject` from Expo | **`expo eject` does not exist since SDK 46.** Use `expo prebuild` | [docs.expo.dev/llms.txt](https://docs.expo.dev/llms.txt) |
+| Use `useAnimatedGestureHandler` | Gesture API v2 from Gesture Handler | [Reanimated 3→4 migration](https://docs.swmansion.com/react-native-reanimated/docs/guides/migration-from-3.x) |
+| Reanimated 3 with New Arch when 4 is available | Reanimated 4 | [Reanimated docs](https://docs.swmansion.com/react-native-reanimated/) |
+| Assume `requestBackgroundPermissionsAsync` will show "Allow Once" dialog on iOS | Silently fails | [docs.expo.dev/versions/latest/sdk/location](https://docs.expo.dev/versions/latest/sdk/location/) |
+| `getExpoPushTokenAsync` before `setNotificationChannelAsync` on Android 13+ | Create channel first | [docs.expo.dev/versions/latest/sdk/notifications](https://docs.expo.dev/versions/latest/sdk/notifications/) |
+| Path alias `@/*` without `tsconfigPaths` enabled | Enable it or Metro does not resolve | [docs.expo.dev/guides/typescript](https://docs.expo.dev/guides/typescript/) |
+| `console.log` in production | `babel-plugin-transform-remove-console` | [reactnative.dev/docs/performance](https://reactnative.dev/docs/performance) |
+| **`function Component() { ... }`** | **`const Component = () => { ... }`** | This skill's convention (rule 1) |
+| **Propose Zod without the user asking** | **RHF built-in `rules={{ required, minLength, pattern, validate }}`** | This skill's convention (rule 3) |
+| Invent conventions ignoring `AGENTS.md`/`architecture.md` | Read them first; replicate what they define | This skill's convention (rule 2) |
 
-## Reglas operativas para el agente
+## Operative rules for the agent
 
-1. **Antes de recomendar un patrón, abre el `references/` correspondiente y verifica contra la URL oficial listada al final del bloque.** Si el patrón que ibas a proponer no aparece, no lo inventes — busca en la doc oficial primero.
-2. **Cita la URL** al final de cada recomendación técnica específica (formato: `[fuente](https://...)`).
-3. **Lee `AGENTS.md` / `architecture.md` del proyecto antes de proponer estructura de carpetas, naming o imports.** Si el proyecto define convenciones, esas ganan sobre los defaults de esta skill.
-4. **Escribe componentes, screens, hooks y métodos internos como arrow functions.** Solo usa `function` para helpers/utils/pure no-UI.
-5. **No propongas Zod/Valibot/Yup por defecto en formularios.** Si el usuario lo pide explícitamente o el proyecto ya lo usa, intégralo.
-6. **Si el usuario pregunta algo fuera del scope de la skill** (ej. Flutter, Swift nativo, Android Kotlin, backend puro), responde brevemente y sugiere el skill o doc apropiado. No fuerces esta skill.
-7. **Si el usuario da una instrucción explícita que contradice la doc oficial**, sigue al usuario pero advierte el trade-off en 1-2 frases.
-8. **Para "qué versión de X debo usar"**, prioriza siempre la última visible en `docs.expo.dev/versions/latest/` o la rama del paquete en GitHub. Si hay breaking change reciente (ej. Reanimated 3→4), mencionalo.
-9. **No instales dependencias por tu cuenta.** Recomienda el comando `npx expo install <pkg>` y deja que el usuario lo corra.
-10. **Cuando menciones un paquete deprecated o inexistente** (ej. `expo-permissions`, `react-test-renderer` para React 19, `expo publish`), di explícitamente que ya no existe y por qué.
+1. **Before recommending a pattern, open the corresponding `references/` and verify against the official URL listed at the end of the block.** If the pattern you were about to propose does not appear, do not invent it — search the official docs first.
+2. **Cite the URL** at the end of each specific technical recommendation (format: `[source](https://...)`).
+3. **Read `AGENTS.md` / `architecture.md` of the project before proposing folder structure, naming, or imports.** If the project defines conventions, those win over this skill's defaults.
+4. **Write components, screens, hooks, and internal methods as arrow functions.** Only use `function` for non-UI helpers/utils/pure functions.
+5. **Do not propose Zod/Valibot/Yup by default in forms.** If the user explicitly asks or the project already uses one, integrate it.
+6. **If the user asks something outside the skill's scope** (e.g., Flutter, native Swift, Android Kotlin, pure backend), respond briefly and suggest the appropriate skill or doc. Do not force this skill.
+7. **If the user gives an explicit instruction that contradicts the official docs**, follow the user but warn about the trade-off in 1-2 sentences.
+8. **For "what version of X should I use"**, always prioritize the latest visible on `docs.expo.dev/versions/latest/` or the package's branch on GitHub. If there is a recent breaking change (e.g., Reanimated 3→4), mention it.
+9. **Do not install dependencies on your own.** Recommend the command `npx expo install <pkg>` and let the user run it.
+10. **When mentioning a deprecated or non-existent package** (e.g., `expo-permissions`, `react-test-renderer` for React 19, `expo publish`), say explicitly that it no longer exists and why.
 
-## Versiones de referencia (verificadas contra docs oficiales, ago 2026)
+## Reference versions (verified against official docs, Aug 2026)
 
-| Componente | Versión actual |
+| Component | Current version |
 |---|---|
-| Expo SDK | 54 (target de esta skill); docs muestran 57 como latest pero 54 estable |
-| React Native | 0.81+ (New Architecture default desde SDK 53) |
+| Expo SDK | 54 (this skill's target); docs show 57 as latest but 54 stable |
+| React Native | 0.81+ (New Architecture default since SDK 53) |
 | React | 19+ |
 | expo-router | v5+ |
 | TanStack Query | v5 |
 | react-hook-form | v7+ |
-| `@hookform/resolvers` | ^3.10 (requerido para Zod v4, si se usa Zod) |
-| Reanimated | 4.x (requiere New Arch) |
+| `@hookform/resolvers` | ^3.10 (required for Zod v4, if Zod is used) |
+| Reanimated | 4.x (requires New Arch) |
 | FlashList | v2.x |
-| Drizzle ORM | compatible con `expo-sqlite` |
-| jest-expo | última estable |
-| @testing-library/react-native | reemplaza `react-test-renderer` (React 19+) |
-| Maestro | mobile.dev (recomendado oficial para E2E) |
+| Drizzle ORM | compatible with `expo-sqlite` |
+| jest-expo | latest stable |
+| @testing-library/react-native | replaces `react-test-renderer` (React 19+) |
+| Maestro | mobile.dev (officially recommended for E2E) |
 | EAS CLI | ≥15 |
 
-## Cómo extender esta skill
+## How to extend this skill
 
-Si al usar la skill descubres un patrón nuevo (no documentado aquí) o un cambio importante en doc oficial, actualiza el `references/` correspondiente y, si el cambio afecta una decisión arquitectónica de las listadas arriba, actualiza también este SKILL.md.
+If while using the skill you discover a new pattern (not documented here) or an important change in official docs, update the corresponding `references/` and, if the change affects an architectural decision listed above, also update this SKILL.md.

@@ -1,16 +1,16 @@
-# Deployment, testing, lint y debugging
+# Deployment, testing, lint and debugging
 
-> **Fuentes oficiales:** https://docs.expo.dev/build/introduction/ · https://docs.expo.dev/eas/ · https://docs.expo.dev/eas/json/ · https://docs.expo.dev/eas/workflows/introduction/ · https://docs.expo.dev/eas-update/introduction/ · https://docs.expo.dev/develop/unit-testing/ · https://docs.expo.dev/guides/local-app-development/ · https://docs.expo.dev/guides/using-eslint/ · https://docs.expo.dev/workflow/continuous-native-generation/
+> **Official sources:** https://docs.expo.dev/build/introduction/ · https://docs.expo.dev/eas/ · https://docs.expo.dev/eas/json/ · https://docs.expo.dev/eas/workflows/introduction/ · https://docs.expo.dev/eas-update/introduction/ · https://docs.expo.dev/develop/unit-testing/ · https://docs.expo.dev/guides/local-app-development/ · https://docs.expo.dev/guides/using-eslint/ · https://docs.expo.dev/workflow/continuous-native-generation/
 
 ## 1. EAS (Expo Application Services)
 
-Servicios oficiales:
-- **EAS Build** — binarios iOS/Android firmados.
-- **EAS Submit** — subida a App Store / Play Store.
+Official services:
+- **EAS Build** — signed iOS/Android binaries.
+- **EAS Submit** — upload to App Store / Play Store.
 - **EAS Update** — OTA updates.
-- **EAS Workflows** — CI/CD managed.
+- **EAS Workflows** — managed CI/CD.
 - **EAS Hosting** — web + API routes.
-- **EAS Metadata** (preview) — info para stores.
+- **EAS Metadata** (preview) — info for stores.
 - **EAS Insights** (preview) — analytics.
 - **EAS Observe** (beta) — performance monitoring.
 
@@ -58,59 +58,59 @@ Servicios oficiales:
 }
 ```
 
-**Perfiles típicos oficiales:**
-- `base` — comunes.
-- `development` — dev client, sin firma, simulator iOS.
+**Official typical profiles:**
+- `base` — common.
+- `development` — dev client, no signature, iOS simulator.
 - `staging` / `preview` — internal distribution (APK/ad-hoc).
 - `production` — store.
 
-## 3. Build local vs cloud
+## 3. Local build vs cloud
 
-### Cloud (recomendado)
+### Cloud (recommended)
 
 ```sh
-eas build --profile production       # iOS o Android según target por default
+eas build --profile production       # iOS or Android depending on default target
 eas build --platform ios
 eas build --platform android
-eas build --local                    # build en tu máquina (usa docker)
+eas build --local                    # build on your machine (uses docker)
 ```
 
-### Compilar local (Expo CLI)
+### Local compile (Expo CLI)
 
 ```sh
 npx expo run:android
 npx expo run:ios
 ```
 
-Equivalente antiguo: `npx expo start --android` / `--ios` (deprecated).
+Older equivalent: `npx expo start --android` / `--ios` (deprecated).
 
-**Comportamiento:**
-- Compila con Android SDK / Xcode locales.
-- Genera `android/` y `ios/` si no existen (corre `expo prebuild`).
-- Instala el binario en device/emulator.
-- Arranca Metro.
+**Behavior:**
+- Compiles with local Android SDK / Xcode.
+- Generates `android/` and `ios/` if they don't exist (runs `expo prebuild`).
+- Installs the binary on device/emulator.
+- Starts Metro.
 
-**Variantes Android (SDK 54+):** `--variant debugOptimized` para iteración más rápida.
+**Android variants (SDK 54+):** `--variant debugOptimized` for faster iteration.
 
-### Workflow diario
+### Daily workflow
 
-| Comando | Cuándo |
+| Command | When |
 |---|---|
-| `npx expo run:android` / `run:ios` | Primer build, tras agregar lib nativa, o cambiar config plugin |
-| `npx expo start` | Solo cambios JS/TS |
-| `eas build --profile preview` | Build para QA / TestFlight / internal track |
-| `eas build --profile production` | Build para store |
-| `eas build --local` | Build local (sin subir a cloud) |
+| `npx expo run:android` / `run:ios` | First build, after adding a native lib, or changing a config plugin |
+| `npx expo start` | JS/TS changes only |
+| `eas build --profile preview` | Build for QA / TestFlight / internal track |
+| `eas build --profile production` | Build for store |
+| `eas build --local` | Local build (without uploading to cloud) |
 
-## 4. Submit a stores
+## 4. Submit to stores
 
 ```sh
 npm install --global eas-cli
-eas build --auto-submit       # build + submit en un solo comando
-eas submit                    # submit de un build existente
+eas build --auto-submit       # build + submit in one command
+eas submit                    # submit an existing build
 ```
 
-Maneja automáticamente: code signing, universal links, iCloud, notifications (según config plugins).
+Automatically handles: code signing, universal links, iCloud, notifications (depending on config plugins).
 
 ## 5. OTA Updates — `expo-updates`
 
@@ -120,40 +120,40 @@ eas update:configure
 eas update --branch production --message "Fix login button alignment"
 ```
 
-### Limitaciones oficiales (crítico)
+### Official limitations (critical)
 
-> ❌ Cambios a native code o native deps.
-> ❌ Cambios a permissions.
-> ❌ Cambio de Expo SDK.
-> ❌ Cualquier cosa que requiera nuevo binary.
+> ❌ Changes to native code or native deps.
+> ❌ Changes to permissions.
+> ❌ Change of Expo SDK.
+> ❌ Anything that requires a new binary.
 
-### Channel en `eas.json` (vincula build ↔ updates)
+### Channel in `eas.json` (links build ↔ updates)
 
 ```json
 "production": { "extends": "base", "channel": "production" }
 ```
 
-**Runtime versions** (`expo-android-runtime-version`, `expo-ios-runtime-version` o fingerprint) garantizan que updates solo lleguen a builds con código nativo compatible.
+**Runtime versions** (`expo-android-runtime-version`, `expo-ios-runtime-version` or fingerprint) guarantee that updates only reach builds with compatible native code.
 
-### API JS
+### JS API
 
 ```ts
 import { useUpdates, checkForUpdateAsync, fetchUpdateAsync } from 'expo-updates';
 ```
 
-> ⚠️ Classic Updates (`expo publish`) está **deprecated desde dic-2021**. Migrar a EAS Update.
+> ⚠️ Classic Updates (`expo publish`) is **deprecated since Dec 2021**. Migrate to EAS Update.
 
 ## 6. CI/CD — EAS Workflows
 
-Sistema CI/CD nativo de EAS, corre en infraestructura managed (no requiere mantener runners).
+EAS's native CI/CD system, runs on managed infrastructure (no need to maintain runners).
 
-**Máquinas:**
+**Machines:**
 - `linux-medium` (4 vCPU, 16 GB RAM)
 - `linux-large` (8 vCPU, 32 GB RAM)
 - `macos-medium` (5 cores, 20 GB RAM)
 - `macos-large` (10 cores, 40 GB RAM)
 
-**Jobs pre-empaquetados:** `build`, `submit`, `update`, `maestro`, `fingerprint`, `get-build`, `slack`.
+**Pre-packaged jobs:** `build`, `submit`, `update`, `maestro`, `fingerprint`, `get-build`, `slack`.
 
 **Workflow YAML** (`.eas/workflows/*.yml`):
 
@@ -179,9 +179,9 @@ jobs:
       flow_path: ['.maestro/home.yml', '.maestro/expand_test.yml']
 ```
 
-**Triggers oficiales:** `push`, `pull_request`, `label`, `schedule` (cron), `delete`, `app_store_connect`, `workflow_dispatch`.
+**Official triggers:** `push`, `pull_request`, `label`, `schedule` (cron), `delete`, `app_store_connect`, `workflow_dispatch`.
 
-**Actualización OTA vía workflow:**
+**OTA update via workflow:**
 
 ```yaml
 jobs:
@@ -192,7 +192,7 @@ jobs:
       channel: production
 ```
 
-**GitHub Actions** (alternativa): https://docs.expo.dev/eas-update/github-actions.md
+**GitHub Actions** (alternative): https://docs.expo.dev/eas-update/github-actions.md
 
 ## 7. Testing
 
@@ -216,7 +216,7 @@ npx expo install jest-expo jest @types/jest --dev
 }
 ```
 
-Variantes oficiales para `pnpm` y `bun` (incluyen `.pnpm` / `.bun` en el patrón).
+Official variants for `pnpm` and `bun` (include `.pnpm` / `.bun` in the pattern).
 
 ### Component: `@testing-library/react-native`
 
@@ -224,7 +224,7 @@ Variantes oficiales para `pnpm` y `bun` (incluyen `.pnpm` / `.bun` en el patrón
 npx expo install @testing-library/react-native --dev
 ```
 
-> ⚠️ **`react-test-renderer` ya no soporta React 19+**. Usar `@testing-library/react-native`.
+> ⚠️ **`react-test-renderer` no longer supports React 19+**. Use `@testing-library/react-native`.
 
 ```tsx
 import { render } from '@testing-library/react-native';
@@ -257,7 +257,7 @@ describe('<HomeScreen />', () => {
 }
 ```
 
-**Estructura recomendada (oficial):**
+**Recommended structure (official):**
 
 ```
 __tests__/                            # global
@@ -267,13 +267,13 @@ src/components/
   __tests__/themed-text-test.tsx      # co-located
 ```
 
-`jest-expo` también reconoce archivos `*-test.ts|tsx`.
+`jest-expo` also recognizes `*-test.ts|tsx` files.
 
-### E2E: **Maestro (oficial recomendado)**
+### E2E: **Maestro (officially recommended)**
 
-> ⚠️ **Recomendación oficial actual:** Maestro (mobile.dev). Expo lo integra nativamente en EAS Workflows con un job type `maestro`.
+> ⚠️ **Current official recommendation:** Maestro (mobile.dev). Expo integrates it natively in EAS Workflows with a `maestro` job type.
 
-Ejemplo flow (`.maestro/home.yml`):
+Example flow (`.maestro/home.yml`):
 
 ```yaml
 appId: dev.expo.eastestsexample
@@ -282,15 +282,15 @@ appId: dev.expo.eastestsexample
 - assertVisible: 'Welcome!'
 ```
 
-> **Documentación Maestro:** https://docs.maestro.dev/
+> **Maestro documentation:** https://docs.maestro.dev/
 
-Detox no aparece recomendado en la documentación oficial actual de Expo.
+Detox does not appear recommended in the current official Expo documentation.
 
-### Mocking de módulos nativos
+### Mocking native modules
 
-El preset `jest-expo` mockea automáticamente la parte nativa del SDK Expo. Para módulos nativos custom, se usa `jest.mock()` estándar.
+The `jest-expo` preset automatically mocks the native part of the Expo SDK. For custom native modules, standard `jest.mock()` is used.
 
-## 8. Lint y formato
+## 8. Lint and format
 
 ### ESLint (Flat config, SDK 53+)
 
@@ -298,7 +298,7 @@ El preset `jest-expo` mockea automáticamente la parte nativa del SDK Expo. Para
 npx expo lint
 ```
 
-Instala deps + crea `eslint.config.js`:
+Installs deps + creates `eslint.config.js`:
 
 ```js
 const { defineConfig } = require('eslint/config');
@@ -312,48 +312,48 @@ module.exports = defineConfig([
 ]);
 ```
 
-### Convenciones oficiales
+### Official conventions
 
-- `eslint-config-expo` es **mínimo** (JSX, TS, globals, plataformas `.android.js/.ios.js/.web.js`). Se **compone** con otras reglas.
-- `metro.config.js` no requiere Node globals extra en flat config (built-in).
-- Para `babel.config.js` sí se necesita `globals.node` explícito.
+- `eslint-config-expo` is **minimal** (JSX, TS, globals, `.android.js/.ios.js/.web.js` platforms). It is **composed** with other rules.
+- `metro.config.js` does not require extra Node globals in flat config (built-in).
+- For `babel.config.js` you do need `globals.node` explicit.
 
 ## 9. Continuous Native Generation (CNG) / Prebuild
 
-> Sustituye al antiguo "eject" / "managed vs bare". **Todo proyecto Expo usa CNG ahora.**
+> Replaces the old "eject" / "managed vs bare". **Every Expo project now uses CNG.**
 
 ```sh
 npx expo prebuild
-npx expo prebuild --clean      # Borra y regenera android/ios
+npx expo prebuild --clean      # Delete and regenerate android/ios
 npx expo prebuild --platform ios
 ```
 
-**Side effects conocidos:**
-- Modifica `scripts` en `package.json` (`expo start --android` → `expo run:android`).
-- Modifica `dependencies`.
+**Known side effects:**
+- Modifies `scripts` in `package.json` (`expo start --android` → `expo run:android`).
+- Modifies `dependencies`.
 
-**`.gitignore` recomendado:**
+**Recommended `.gitignore`:**
 
 ```
 /android
 /ios
 ```
 
-**Customization:** vía [config plugins](https://docs.expo.dev/config-plugins/introduction/). No modificar `android/` / `ios/` a mano (se pierde en `--clean`).
+**Customization:** via [config plugins](https://docs.expo.dev/config-plugins/introduction/). Do not edit `android/` / `ios/` by hand (it is lost on `--clean`).
 
-## 10. Errores comunes de LLMs (oficial, `docs.expo.dev/llms.txt`)
+## 10. Common LLM errors (official, `docs.expo.dev/llms.txt`)
 
-- **`expo eject` no existe** desde SDK 46 (2022). Usar `expo prebuild`.
-- **`expo-cli` global está deprecated.** Usar `npx expo`.
-- **No hay "managed vs bare workflow".** Todos los proyectos usan la misma arquitectura (CNG).
-- React Native recomienda Expo como default way de crear proyectos.
+- **`expo eject` does not exist** since SDK 46 (2022). Use `expo prebuild`.
+- **`expo-cli` global is deprecated.** Use `npx expo`.
+- **There is no "managed vs bare workflow".** All projects use the same architecture (CNG).
+- React Native recommends Expo as the default way to create projects.
 
-## 11. Comandos clave — cheat sheet
+## 11. Key commands — cheat sheet
 
 ```sh
-# Dev local
+# Local dev
 npx expo start                                  # Metro only
-npx expo run:android --variant debugOptimized   # Android con debug rápido
+npx expo run:android --variant debugOptimized   # Android with fast debug
 npx expo run:ios                                # iOS
 
 # Build / Submit
@@ -372,7 +372,7 @@ eas update --branch production --message "..."
 npx expo prebuild
 npx expo prebuild --clean
 
-# Validación
+# Validation
 npx expo install --check
 npx expo-doctor@latest
 npx expo config --type public
@@ -382,9 +382,9 @@ npx expo lint
 npm test
 ```
 
-## 12. Versionado
+## 12. Versioning
 
-- **`expo-updates`** reemplaza `expo publish` (dep. dic-2021).
-- **`react-test-renderer`** ya no soporta React 19+. Usar `@testing-library/react-native`.
-- **Maestro** es la recomendación oficial actual para E2E (no Detox).
-- **Flipper está deprecado** por RN core. Reemplazado por React DevTools + Expo Dev Tools.
+- **`expo-updates`** replaces `expo publish` (deprecated Dec 2021).
+- **`react-test-renderer`** no longer supports React 19+. Use `@testing-library/react-native`.
+- **Maestro** is the current official recommendation for E2E (not Detox).
+- **Flipper is deprecated** by RN core. Replaced by React DevTools + Expo Dev Tools.

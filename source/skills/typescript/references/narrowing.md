@@ -1,10 +1,10 @@
-# Type Narrowing y Discriminated Unions
+# Type Narrowing and Discriminated Unions
 
-> **Fuentes oficiales:** https://www.typescriptlang.org/docs/handbook/2/narrowing.html · https://www.typescriptlang.org/docs/handbook/2/types-from-types.html · https://www.typescriptlang.org/docs/handbook/2/narrowing.html#discriminated-unions
+> **Official sources:** https://www.typescriptlang.org/docs/handbook/2/narrowing.html · https://www.typescriptlang.org/docs/handbook/2/types-from-types.html · https://www.typescriptlang.org/docs/handbook/2/narrowing.html#discriminated-unions
 
-## 1. Narrowing built-in
+## 1. Built-in narrowing
 
-### `typeof` para primitivos
+### `typeof` for primitives
 
 ```ts
 function process(value: string | number) {
@@ -15,9 +15,9 @@ function process(value: string | number) {
 }
 ```
 
-`typeof` cubre: `string`, `number`, `bigint`, `boolean`, `symbol`, `object`, `function`, `undefined`.
+`typeof` covers: `string`, `number`, `bigint`, `boolean`, `symbol`, `object`, `function`, `undefined`.
 
-### `instanceof` para clases
+### `instanceof` for classes
 
 ```ts
 function handleError(e: unknown) {
@@ -27,7 +27,7 @@ function handleError(e: unknown) {
 }
 ```
 
-### `in` para propiedades
+### `in` for properties
 
 ```ts
 interface Bird { fly(): void }
@@ -53,11 +53,11 @@ function print(value: string | null) {
 }
 ```
 
-Cuidado: `""`, `0`, `NaN`, `false`, `null`, `undefined` son falsy. Si necesitas distinguir, usa `== null` o `=== undefined`.
+Caution: `""`, `0`, `NaN`, `false`, `null`, `undefined` are falsy. If you need to distinguish, use `== null` or `=== undefined`.
 
 ## 2. Type predicates (`x is T`)
 
-Cuando el guard no es built-in, escribí una función con type predicate:
+When the guard is not built-in, write a function with a type predicate:
 
 ```ts
 interface Cat { kind: 'cat'; meow(): void }
@@ -73,7 +73,7 @@ const cats = animals.filter(isCat);
 // cats[0].bark() // Error
 ```
 
-### Type predicates para narrowing de `unknown`
+### Type predicates for narrowing `unknown`
 
 ```ts
 const isUser = (x: unknown): x is User =>
@@ -86,11 +86,11 @@ function handle(input: unknown) {
 }
 ```
 
-Para validación más compleja (JSON de un backend), considera una librería de validación runtime solo si el proyecto la usa (Zod, Valibot, ArkType, etc.). **Esta skill no las recomienda por defecto** — ver convención 3 del SKILL.md.
+For more complex validation (JSON from a backend), consider a runtime validation library only if the project uses one (Zod, Valibot, ArkType, etc.). **This skill does not recommend them by default** — see convention 3 of SKILL.md.
 
 ## 3. Discriminated unions
 
-Patrón clave para estados o resultados con variantes. Cada miembro de la union tiene un campo literal común que TS usa para narrowar.
+Key pattern for states or results with variants. Each member of the union has a common literal field that TS uses to narrow.
 
 ```ts
 type Result<T, E> =
@@ -105,17 +105,17 @@ const handle = (r: Result<string, Error>): string => {
 };
 ```
 
-### El discriminante debe ser **literal**
+### The discriminant must be **literal**
 
 ```ts
-// ✅ BIEN
+// ✅ GOOD
 type Status = { kind: 'idle' } | { kind: 'loading' } | { kind: 'success'; data: string } | { kind: 'error'; err: Error };
 
-// ❌ MAL — string no es literal, TS no puede narrowar
+// ❌ BAD — string is not literal, TS cannot narrow
 type Status = { kind: string };
 ```
 
-### Discriminante con `tag` o `type` también funciona
+### Discriminant with `tag` or `type` also works
 
 ```ts
 type Event =
@@ -132,9 +132,9 @@ const handle = (e: Event): void => {
 };
 ```
 
-## 4. Exhaustiveness con `never`
+## 4. Exhaustiveness with `never`
 
-Cuando cubrís una union con `switch`, agregá un `default: assertNever(s)` que **fuerza** un error de TS si añadís un caso nuevo a la union.
+When you cover a union with `switch`, add a `default: assertNever(s)` that **forces** a TS error if you add a new case to the union.
 
 ```ts
 type Status = 'pending' | 'success' | 'error';
@@ -152,11 +152,11 @@ const label = (s: Status): string => {
   }
 };
 
-// Si añades 'cancelled' a Status, el switch falla con:
+// If you add 'cancelled' to Status, the switch fails with:
 //   Argument of type '"cancelled"' is not assignable to parameter of type 'never'
 ```
 
-### Variante con `satisfies`
+### Variant with `satisfies`
 
 ```ts
 const labels: Record<Status, string> = {
@@ -164,14 +164,14 @@ const labels: Record<Status, string> = {
   success: 'Done',
   error: 'Failed',
 };
-// Si añades 'cancelled' a Status, este objeto falla con Property '"cancelled"' is missing
+// If you add 'cancelled' to Status, this object fails with Property '"cancelled"' is missing
 ```
 
-`Record<Status, string>` es otra forma de enforce exhaustividad, útil cuando el mapeo es 1:1 con strings.
+`Record<Status, string>` is another way to enforce exhaustiveness, useful when the mapping is 1:1 with strings.
 
 ## 5. Assertion functions
 
-Una función que lanza si la aserción falla. El tipo se narrowa en el resto del scope.
+A function that throws if the assertion fails. The type is narrowed in the rest of the scope.
 
 ```ts
 function assertDefined<T>(value: T | null | undefined): asserts value is T {
@@ -187,15 +187,15 @@ function process(user: User | null) {
 }
 ```
 
-Forma alternativa: `asserts condition`.
+Alternative form: `asserts condition`.
 
-## 6. Casos comunes
+## 6. Common cases
 
-### Narrowing de arrays
+### Array narrowing
 
 ```ts
 function firstElement<T>(arr: T[]): T | undefined {
-  return arr[0]; // con noUncheckedIndexedAccess: T | undefined
+  return arr[0]; // with noUncheckedIndexedAccess: T | undefined
 }
 
 const items = ['a', 'b', 'c'];
@@ -205,9 +205,9 @@ if (head !== undefined) {
 }
 ```
 
-### Narrowing de objetos con `Object.keys`
+### Object narrowing with `Object.keys`
 
-`Object.keys(obj)` retorna `string[]`, no las keys específicas de `obj`. Para narrowar:
+`Object.keys(obj)` returns `string[]`, not the specific keys of `obj`. To narrow:
 
 ```ts
 function getValues<T extends object>(obj: T): Array<T[keyof T]> {
@@ -215,9 +215,9 @@ function getValues<T extends object>(obj: T): Array<T[keyof T]> {
 }
 ```
 
-O usa un type guard custom si necesitás garantizar la key.
+Or use a custom type guard if you need to guarantee the key.
 
-### Narrowing de errores
+### Error narrowing
 
 ```ts
 try {
@@ -233,12 +233,12 @@ try {
 }
 ```
 
-## 7. Trampas comunes
+## 7. Common traps
 
-| Trampa | Solución |
+| Trap | Solution |
 |---|---|
-| Narrowing se pierde después de un await | Re-narrow después del await o usa `asserts` |
-| `if (value !== null)` no narrowa `value` | Asegurate de usar `===`/`!==`, no `==`/`!=` |
-| Discriminante opcional (`kind?: string`) | Hazlo obligatorio: `kind: 'loading'` |
-| Narrowing de union con `kind: string` (no literal) | Usa literal: `kind: 'loading' as const` |
-| Narrowing en callback async | Captura la variable narrowada **antes** del await |
+| Narrowing is lost after an await | Re-narrow after the await or use `asserts` |
+| `if (value !== null)` does not narrow `value` | Make sure to use `===`/`!==`, not `==`/`!=` |
+| Optional discriminant (`kind?: string`) | Make it required: `kind: 'loading'` |
+| Narrowing a union with `kind: string` (not literal) | Use literal: `kind: 'loading' as const` |
+| Narrowing in an async callback | Capture the narrowed variable **before** the await |

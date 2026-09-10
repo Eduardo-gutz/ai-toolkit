@@ -1,12 +1,12 @@
-# Utility Types — Referencia
+# Utility Types — Reference
 
-> **Fuente oficial:** https://www.typescriptlang.org/docs/handbook/utility-types.html
+> **Official source:** https://www.typescriptlang.org/docs/handbook/utility-types.html
 
-Todos los utility types están en **global scope** — no importes nada.
+All utility types are in **global scope** — do not import anything.
 
-## 1. Modificadores
+## 1. Modifiers
 
-### `Partial<T>` — todas las props opcionales
+### `Partial<T>` — all props optional
 
 ```ts
 interface User { id: string; name: string; email: string }
@@ -14,9 +14,9 @@ type UserUpdate = Partial<User>;
 // { id?: string; name?: string; email?: string }
 ```
 
-Uso: payloads de `PATCH`/`PUT` parciales, defaults en factories.
+Use: partial `PATCH`/`PUT` payloads, defaults in factories.
 
-### `Required<T>` — todas las props obligatorias
+### `Required<T>` — all props required
 
 ```ts
 interface Config { debug?: boolean; verbose?: boolean }
@@ -24,7 +24,7 @@ type StrictConfig = Required<Config>;
 // { debug: boolean; verbose: boolean }
 ```
 
-### `Readonly<T>` — todas las props de solo lectura
+### `Readonly<T>` — all props read-only
 
 ```ts
 type FrozenUser = Readonly<User>;
@@ -34,11 +34,11 @@ const u: FrozenUser = { id: '1', name: 'Ana' };
 u.name = 'Bea'; // ❌ Error
 ```
 
-Uso: state inmutable, props de React, configs.
+Use: immutable state, React props, configs.
 
-## 2. Selección
+## 2. Selection
 
-### `Pick<T, K>` — subset de props
+### `Pick<T, K>` — subset of props
 
 ```ts
 interface User { id: string; email: string; password: string; createdAt: Date }
@@ -46,9 +46,9 @@ type UserSummary = Pick<User, 'id' | 'email'>;
 // { id: string; email: string }
 ```
 
-Uso: view models, DTOs.
+Use: view models, DTOs.
 
-### `Omit<T, K>` — todo excepto K
+### `Omit<T, K>` — everything except K
 
 ```ts
 type UserResponse = Omit<User, 'password'>;
@@ -57,14 +57,14 @@ type CreateUser = Omit<User, 'id' | 'createdAt'>;
 // { email: string; password: string }
 ```
 
-### `Record<K, V>` — diccionario tipado
+### `Record<K, V>` — typed dictionary
 
 ```ts
 type Status = 'idle' | 'loading' | 'success' | 'error';
 type StatusMessages = Record<Status, string>;
 // { idle: string; loading: string; success: string; error: string }
 
-// Equivalente a:
+// Equivalent to:
 type StatusMessages = {
   idle: string;
   loading: string;
@@ -73,22 +73,22 @@ type StatusMessages = {
 };
 ```
 
-`Record<K, V>` con union `K` **obliga** a tener todas las keys. Útil para enums-like.
+`Record<K, V>` with a `K` union **forces** having all keys. Useful for enum-like patterns.
 
-## 3. Uniones
+## 3. Unions
 
-### `Exclude<T, U>` — quitar miembros
+### `Exclude<T, U>` — remove members
 
 ```ts
 type Status = 'idle' | 'loading' | 'success' | 'error';
 type ActiveStatus = Exclude<Status, 'idle'>;
 // 'loading' | 'success' | 'error'
 
-// Quitar null/undefined:
+// Remove null/undefined:
 type NonNullable<T> = T extends null | undefined ? never : T;
 ```
 
-### `Extract<T, U>` — intersección de uniones
+### `Extract<T, U>` — union intersection
 
 ```ts
 type A = 'a' | 'b' | 'c';
@@ -97,7 +97,7 @@ type Common = Extract<A, B>;
 // 'b' | 'c'
 ```
 
-### `NonNullable<T>` — quitar `null`/`undefined`
+### `NonNullable<T>` — remove `null`/`undefined`
 
 ```ts
 type MaybeString = string | null | undefined;
@@ -105,9 +105,9 @@ type DefiniteString = NonNullable<MaybeString>;
 // string
 ```
 
-## 4. Funciones
+## 4. Functions
 
-### `ReturnType<T>` — tipo de retorno de una función
+### `ReturnType<T>` — function return type
 
 ```ts
 function fetchUser() { return Promise.resolve({ id: '1', name: 'Ana' }); }
@@ -115,7 +115,7 @@ type FetchedUser = Awaited<ReturnType<typeof fetchUser>>;
 // { id: string; name: string }
 ```
 
-### `Parameters<T>` — tuple de params
+### `Parameters<T>` — params tuple
 
 ```ts
 function createUser(email: string, age: number, admin: boolean) { /* ... */ }
@@ -126,7 +126,7 @@ type FirstParam = CreateUserParams[0];
 // string
 ```
 
-### `Awaited<T>` — desenvolver Promise/thenable
+### `Awaited<T>` — unwrap Promise/thenable
 
 ```ts
 type P = Promise<Promise<string>>;
@@ -139,33 +139,33 @@ type Results = Awaited<typeof promises[number]>;
 // number | string
 ```
 
-### `NoInfer<T>` — bloquear inferencia en un parámetro (TS 5.4+)
+### `NoInfer<T>` — block inference on a parameter (TS 5.4+)
 
 ```ts
-// ❌ Sin NoInfer: TS infiere T desde el array, no desde el literal
+// ❌ Without NoInfer: TS infers T from the array, not from the literal
 function createLogger<T extends string>(name: T, levels: T[]) { /* ... */ }
 const logger = createLogger('info', ['info', 'warn', 'error']);
-// T se infiere como 'info' | 'warn' | 'error' (no 'info')
+// T is inferred as 'info' | 'warn' | 'error' (not 'info')
 
-// ✅ Con NoInfer: T se infiere solo desde `name`
+// ✅ With NoInfer: T is inferred only from `name`
 function createLogger<T extends string>(name: NoInfer<T>, levels: T[]) { /* ... */ }
 const logger = createLogger('info', ['info', 'warn', 'error']);
-// T es 'info', y 'warn'/'error' causarían error (que es lo que queremos)
+// T is 'info', and 'warn'/'error' would cause an error (which is what we want)
 ```
 
-Uso típico: funciones donde un parámetro es la fuente de verdad y otros deben ser consistentes con él.
+Typical use: functions where one parameter is the source of truth and others must be consistent with it.
 
-## 5. Casos compuestos
+## 5. Compound cases
 
-### DTOs de update
+### Update DTOs
 
 ```ts
 interface User { id: string; email: string; password: string; createdAt: Date; name: string }
 
-// Update parcial:
+// Partial update:
 type UserUpdate = Partial<Pick<User, 'email' | 'name'>>;
 
-// Update con campos sensibles explícitos (no se puede cambiar password sin más):
+// Update with explicit sensitive fields (password cannot be changed without more):
 type AdminUserUpdate = Partial<Pick<User, 'email' | 'name' | 'password'>>;
 ```
 
@@ -176,13 +176,13 @@ type UserCard = Pick<User, 'id' | 'name'> & { isAdmin: boolean };
 type UserDetail = User & { lastLogin: Date; sessions: Session[] };
 ```
 
-### Funciones de React
+### React functions
 
 ```ts
 type Event<T extends keyof JSX.IntrinsicElements> = React.ChangeEvent<JSX.IntrinsicElements[T]>;
 ```
 
-### Reducción de tipos derivados
+### Derived type reduction
 
 ```ts
 const config = {
@@ -196,27 +196,27 @@ type Host = Config['host'];        // 'localhost' (literal)
 type Port = Config['port'];        // 3000 (literal)
 ```
 
-## 6. Custom utility types (cuándo vale la pena)
+## 6. Custom utility types (when are they worth it)
 
-Solo escribí un utility type custom cuando:
-- Lo vas a usar en **2+ lugares** (YAGNI en otro caso).
-- **No existe** en el stdlib una combinación que lo resuelva.
-- El "qué" del nombre no es suficiente — necesitás documentar el "por qué".
+Only write a custom utility type when:
+- You will use it in **2+ places** (YAGNI otherwise).
+- There is **no** stdlib combination that solves it.
+- The name's "what" is not enough — you need to document the "why".
 
 ```ts
-// ✅ Justificado: el nombre no comunica el "por qué"
+// ✅ Justified: the name does not communicate the "why"
 type Branded<T, B extends string> = T & { readonly __brand: B };
 type UserId = Branded<string, 'UserId'>;
 type OrderId = Branded<string, 'OrderId'>;
 
-// Evitas pasar un UserId donde se espera OrderId
+// Avoids passing a UserId where OrderId is expected
 const getOrder = (id: OrderId) => { /* ... */ };
 const userId = 'u_123' as UserId;
-getOrder(userId); // ❌ Error: UserId no es asignable a OrderId
+getOrder(userId); // ❌ Error: UserId is not assignable to OrderId
 ```
 
-## 7. Recursos
+## 7. Resources
 
-- [Utility Types handbook](https://www.typescriptlang.org/docs/handbook/utility-types.html) — referencia completa.
+- [Utility Types handbook](https://www.typescriptlang.org/docs/handbook/utility-types.html) — complete reference.
 - [Type Manipulation](https://www.typescriptlang.org/docs/handbook/2/types-from-types.html) — mapped types, conditional types, infer.
-- [Cheat sheets de React TypeScript](https://react-typescript-cheatsheet.netlify.app/) — patrones específicos de React (no parte de esta skill pero complementario).
+- [React TypeScript cheat sheets](https://react-typescript-cheatsheet.netlify.app/) — React-specific patterns (not part of this skill but complementary).

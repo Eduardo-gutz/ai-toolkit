@@ -1,12 +1,12 @@
-# Estado y capa de datos
+# State and data layer
 
-> **Fuentes oficiales:** https://tanstack.com/query/latest · https://react-hook-form.com/ · https://orm.drizzle.team/docs/connect-expo-sqlite · https://docs.expo.dev/versions/latest/sdk/securestore/ · https://docs.expo.dev/versions/latest/sdk/async-storage/ · https://docs.expo.dev/versions/latest/sdk/sqlite/ · https://docs.expo.dev/versions/latest/sdk/auth-session/ · https://docs.expo.dev/guides/authentication/ · https://docs.expo.dev/guides/google-authentication/
+> **Official sources:** https://tanstack.com/query/latest · https://react-hook-form.com/ · https://orm.drizzle.team/docs/connect-expo-sqlite · https://docs.expo.dev/versions/latest/sdk/securestore/ · https://docs.expo.dev/versions/latest/sdk/async-storage/ · https://docs.expo.dev/versions/latest/sdk/sqlite/ · https://docs.expo.dev/versions/latest/sdk/auth-session/ · https://docs.expo.dev/guides/authentication/ · https://docs.expo.dev/guides/google-authentication/
 
 ## 1. Server state — TanStack Query v5
 
-**Cuándo usarlo:** cualquier dato que viva fuera del cliente y se pida/actualice por red. Si el dato es local y síncrono, TanStack Query sobra.
+**When to use it:** any data that lives outside the client and is requested/updated over the network. If the data is local and synchronous, TanStack Query is overkill.
 
-### Setup mínimo
+### Minimum setup
 
 ```tsx
 import { FC } from 'react';
@@ -38,31 +38,31 @@ export default App;
 > *"If your query function depends on a variable, include it in your query key."*
 
 ```tsx
-useQuery({ queryKey: ['todos'], ... })                          // lista
-useQuery({ queryKey: ['todo', 5], ... })                        // detalle por id
+useQuery({ queryKey: ['todos'], ... })                          // list
+useQuery({ queryKey: ['todo', 5], ... })                        // detail by id
 useQuery({ queryKey: ['todos', { status, page }], ... })        // params
-useQuery({ queryKey: ['todos', status, page], ... })            // <- distinto del anterior
+useQuery({ queryKey: ['todos', status, page], ... })            // <- different from the previous one
 ```
 
-Regla: el orden en el array sí importa; en objects no.
+Rule: order in the array matters; in objects it does not.
 
-### Estados
+### States
 
-| Estado | Significado |
+| State | Meaning |
 |---|---|
-| `isPending` / `status === 'pending'` | sin datos |
-| `isError` / `status === 'error'` | falló |
-| `isSuccess` / `status === 'success'` | hay datos |
-| `isFetching` | hay un `queryFn` corriendo (incluye background) |
-| `fetchStatus: 'paused'` | quiere fetch pero no hay red (Network Mode) |
+| `isPending` / `status === 'pending'` | no data |
+| `isError` / `status === 'error'` | failed |
+| `isSuccess` / `status === 'success'` | has data |
+| `isFetching` | a `queryFn` is running (includes background) |
+| `fetchStatus: 'paused'` | wants to fetch but no network (Network Mode) |
 
-### Defaults importantes
+### Important defaults
 
-| Opción | Default | Nota |
+| Option | Default | Note |
 |---|---|---|
-| `staleTime` | `0` | Subir a `2*60*1000` para evitar refetches. `'static'` bloquea totalmente. |
-| `gcTime` | `5 min` | Tras esto el cache se recoge |
-| `retry` | `3` queries / `0` mutations, backoff exponencial | |
+| `staleTime` | `0` | Raise to `2*60*1000` to avoid refetches. `'static'` blocks completely. |
+| `gcTime` | `5 min` | After this the cache is collected |
+| `retry` | `3` queries / `0` mutations, exponential backoff | |
 | `refetchOnMount` / `Window` / `Reconnect` | `true` | |
 
 ### Mutations + optimistic updates
@@ -88,7 +88,7 @@ const useUpdateTodo = () => {
 };
 ```
 
-### Infinite queries (paginación)
+### Infinite queries (pagination)
 
 ```tsx
 import { FC } from 'react';
@@ -107,32 +107,32 @@ const ProjectsList: FC<{}> = () => {
 };
 ```
 
-## 2. Estado cliente — ¿qué dice la doc oficial?
+## 2. Client state — what does the official docs say?
 
-**Expo no prescribe una librería de "client global state".** React oficial recomienda `useState` + `useReducer` + Context para lo que no es server state, y desaconseja meter estado servidor dentro de stores globales.
+**Expo does not prescribe a "global client state" library.** React official recommends `useState` + `useReducer` + Context for what is not server state, and discourages putting server state inside global stores.
 
-Guía Expo [Local-first](https://docs.expo.dev/guides/local-first/) menciona **Legend-State** y **TinyBase** como reactivos cuando construyes arquitectura local-first.
+Expo's [Local-first](https://docs.expo.dev/guides/local-first/) guide mentions **Legend-State** and **TinyBase** as reactives when you build a local-first architecture.
 
-Consenso medible de la comunidad RN (npm downloads 2025-2026):
+Measurable community consensus in RN (npm downloads 2025-2026):
 
-| Librería | Bundle | Cuándo |
+| Library | Bundle | When |
 |---|---|---|
-| **Zustand** | ~1 KB | De facto estándar para store global pequeño. Middlewares: `persist`, `immer`, `mmkv`. |
-| **Jotai** | ~3 KB | Modelo atómico, re-renders finos. Muchos pedazos independientes. |
-| **Redux Toolkit** | ~10 KB | Equipos grandes / debug estricto / RTK Query si quieres todo-en-uno. |
-| **Context API** | 0 KB | 1-2 valores que cambian raro (tema, locale). NO para estado que cambia mucho. |
+| **Zustand** | ~1 KB | De facto standard for small global store. Middlewares: `persist`, `immer`, `mmkv`. |
+| **Jotai** | ~3 KB | Atomic model, fine re-renders. Many independent pieces. |
+| **Redux Toolkit** | ~10 KB | Large teams / strict debug / RTK Query if you want all-in-one. |
+| **Context API** | 0 KB | 1-2 values that change rarely (theme, locale). NOT for state that changes a lot. |
 
-### Cuándo NO usar store global
+### When NOT to use a global store
 
-- El dato viene de servidor → TanStack Query.
-- El dato es local y solo lo usa 1 componente → `useState`/`useReducer`.
-- El dato es local, lo lee toda la app y cambia mucho → Context NO (re-renders); usa Zustand/Jotai.
+- The data comes from the server → TanStack Query.
+- The data is local and only used by 1 component → `useState`/`useReducer`.
+- The data is local, read by the whole app, and changes a lot → Context NO (re-renders); use Zustand/Jotai.
 
-## 3. Formularios — `react-hook-form`
+## 3. Forms — `react-hook-form`
 
-### Default: validación nativa de RHF (sin schema validation)
+### Default: RHF native validation (without schema validation)
 
-**Esta skill recomienda por defecto la validación built-in de `react-hook-form`** vía la prop `rules` en cada `Controller`. Solo se introduce un schema (Zod/Valibot/Yup) cuando el usuario lo pide explícitamente o el proyecto ya lo usa.
+**This skill recommends by default the built-in `react-hook-form` validation** via the `rules` prop on each `Controller`. A schema (Zod/Valibot/Yup) is only introduced when the user explicitly asks for it or the project already uses one.
 
 ```tsx
 import { Controller, useForm } from 'react-hook-form';
@@ -156,7 +156,7 @@ const RegisterScreen: FC<{}> = () => {
   });
 
   const onSubmit = handleSubmit(async (values) => {
-    // llamar al repository, guardar token, navegar
+    // call the repository, save token, navigate
   });
 
   return (
@@ -165,13 +165,13 @@ const RegisterScreen: FC<{}> = () => {
         control={control}
         name="email"
         rules={{
-          required: 'El email es obligatorio',
-          pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Email inválido' },
+          required: 'Email is required',
+          pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Invalid email' },
         }}
         render={({ field: { onChange, onBlur, value } }) => (
           <View>
             <TextInput
-              placeholder="tu@email.com"
+              placeholder="you@email.com"
               autoCapitalize="none"
               keyboardType="email-address"
               onBlur={onBlur}
@@ -187,11 +187,11 @@ const RegisterScreen: FC<{}> = () => {
         control={control}
         name="password"
         rules={{
-          required: 'La contraseña es obligatoria',
-          minLength: { value: 8, message: 'Mínimo 8 caracteres' },
+          required: 'Password is required',
+          minLength: { value: 8, message: 'Minimum 8 characters' },
           validate: {
-            hasUpper: (v) => /[A-Z]/.test(v) || 'Debe incluir una mayúscula',
-            hasNumber: (v) => /\d/.test(v) || 'Debe incluir un número',
+            hasUpper: (v) => /[A-Z]/.test(v) || 'Must include an uppercase letter',
+            hasNumber: (v) => /\d/.test(v) || 'Must include a number',
           },
         }}
         render={({ field: { onChange, onBlur, value } }) => (
@@ -206,8 +206,8 @@ const RegisterScreen: FC<{}> = () => {
         control={control}
         name="confirmPassword"
         rules={{
-          required: 'Confirma tu contraseña',
-          validate: (v, formValues) => v === formValues.password || 'Las contraseñas no coinciden',
+          required: 'Confirm your password',
+          validate: (v, formValues) => v === formValues.password || 'Passwords do not match',
         }}
         render={({ field: { onChange, onBlur, value } }) => (
           <View>
@@ -220,17 +220,17 @@ const RegisterScreen: FC<{}> = () => {
       <Controller
         control={control}
         name="terms"
-        rules={{ validate: (v) => v === true || 'Debes aceptar los términos' }}
+        rules={{ validate: (v) => v === true || 'You must accept the terms' }}
         render={({ field: { onChange, value } }) => (
           <Pressable onPress={() => onChange(!value)}>
-            <Text>{value ? '☑' : '☐'} Acepto los términos</Text>
+            <Text>{value ? '☑' : '☐'} I accept the terms</Text>
             {errors.terms?.message && <Text style={styles.error}>{errors.terms.message}</Text>}
           </Pressable>
         )}
       />
 
       <Pressable onPress={onSubmit} disabled={isSubmitting}>
-        <Text>{isSubmitting ? 'Enviando...' : 'Crear cuenta'}</Text>
+        <Text>{isSubmitting ? 'Submitting...' : 'Create account'}</Text>
       </Pressable>
     </View>
   );
@@ -241,13 +241,13 @@ export default RegisterScreen;
 const styles = { error: { color: 'red' } };
 ```
 
-**Por qué `Controller` y NO `register`:** la doc oficial de react-hook-form recomienda explícitamente `Controller` para inputs de React Native (`TextInput`, etc.). `register` está pensado para inputs HTML nativos que reciben `ref`.
+**Why `Controller` and NOT `register`:** the official react-hook-form docs explicitly recommend `Controller` for React Native inputs (`TextInput`, etc.). `register` is meant for native HTML inputs that receive `ref`.
 
-**`mode: 'onBlur'`** balance entre ruido (re-validar en cada keystroke) y feedback demorado (re-validar solo al enviar).
+**`mode: 'onBlur'`** balances noise (re-validate on each keystroke) and delayed feedback (re-validate only on submit).
 
-### Opt-in: validación con schema (Zod / Valibot / Yup)
+### Opt-in: validation with schema (Zod / Valibot / Yup)
 
-**Solo cuando el usuario lo pide o el proyecto ya lo usa.** Resolvers oficiales soportados: Yup, Zod, Superstruct, Joi, Vest, class-validator, io-ts, Nope, computed-types, typanion, Ajv, TypeBox, ArkType, Valibot, TypeSchema, effect-ts, VineJS, fluentvalidation-ts, ata-validator, cualquier Standard Schema.
+**Only when the user asks or the project already uses one.** Supported official resolvers: Yup, Zod, Superstruct, Joi, Vest, class-validator, io-ts, Nope, computed-types, typanion, Ajv, TypeBox, ArkType, Valibot, TypeSchema, effect-ts, VineJS, fluentvalidation-ts, ata-validator, any Standard Schema.
 
 ```tsx
 import { useForm } from 'react-hook-form';
@@ -269,14 +269,14 @@ const Form: FC<{}> = () => {
 export default Form;
 ```
 
-> ⚠️ **Zod v4** + `@hookform/resolvers` requiere `@hookform/resolvers ^3.10` y `tsconfig.json` con `"moduleResolution": "bundler"` (o `"node16"`/`"nodenext"`).
+> ⚠️ **Zod v4** + `@hookform/resolvers` requires `@hookform/resolvers ^3.10` and `tsconfig.json` with `"moduleResolution": "bundler"` (or `"node16"`/`"nodenext"`).
 
-### `useController` (hook, en lugar del componente)
+### `useController` (hook, instead of the component)
 
-`field` expone `onChange / onBlur / value / name / ref / disabled`. `fieldState`: `invalid / isTouched / isDirty / error`.
+`field` exposes `onChange / onBlur / value / name / ref / disabled`. `fieldState`: `invalid / isTouched / isDirty / error`.
 
 ```tsx
-// Componente UI — arrow function con FC<Props>
+// UI component — arrow function with FC<Props>
 const ControlledInput: FC<UseControllerProps<FormValues>> = (props) => {
   const { field, fieldState } = useController(props);
   return (
@@ -288,23 +288,23 @@ const ControlledInput: FC<UseControllerProps<FormValues>> = (props) => {
 };
 ```
 
-## 4. Storage local — matriz de decisión
+## 4. Local storage — decision matrix
 
-| Necesidad | Librería | URL |
+| Need | Library | URL |
 |---|---|---|
-| Secretos (tokens, refresh tokens, password) | **`expo-secure-store`** | https://docs.expo.dev/versions/latest/sdk/securestore/ |
-| KV no sensible (preferencias, UI flags, drafts) | **`@react-native-async-storage/async-storage`** | https://docs.expo.dev/versions/latest/sdk/async-storage/ |
-| KV rápido, **síncrono**, alto rendimiento | **`react-native-mmkv`** v4 (Nitro Module) | https://github.com/mrousavy/react-native-mmkv |
-| Datos relacionales / queries / joins / sync | **`expo-sqlite`** + opcional **Drizzle ORM** | https://docs.expo.dev/versions/latest/sdk/sqlite/ + https://orm.drizzle.team/docs/connect-expo-sqlite |
-| Reactive DB estilo ORM con sync integrado | **WatermelonDB** | https://watermelondb.dev/docs/Installation |
-| KV de SQLite como drop-in de AsyncStorage | **`expo-sqlite/kv-store`** | https://docs.expo.dev/versions/latest/sdk/sqlite/#key-value-storage |
+| Secrets (tokens, refresh tokens, password) | **`expo-secure-store`** | https://docs.expo.dev/versions/latest/sdk/securestore/ |
+| Non-sensitive KV (preferences, UI flags, drafts) | **`@react-native-async-storage/async-storage`** | https://docs.expo.dev/versions/latest/sdk/async-storage/ |
+| Fast KV, **synchronous**, high performance | **`react-native-mmkv`** v4 (Nitro Module) | https://github.com/mrousavy/react-native-mmkv |
+| Relational data / queries / joins / sync | **`expo-sqlite`** + optional **Drizzle ORM** | https://docs.expo.dev/versions/latest/sdk/sqlite/ + https://orm.drizzle.team/docs/connect-expo-sqlite |
+| Reactive DB ORM-style with integrated sync | **WatermelonDB** | https://watermelondb.dev/docs/Installation |
+| SQLite-backed KV as a drop-in for AsyncStorage | **`expo-sqlite/kv-store`** | https://docs.expo.dev/versions/latest/sdk/sqlite/#key-value-storage |
 
 ### `expo-secure-store`
 
 ```ts
 import * as SecureStore from 'expo-secure-store';
 
-// helpers puros (no UI) — usan function
+// pure helpers (no UI) — use function
 async function saveToken(token) {
   await SecureStore.setItemAsync('access_token', token);
 }
@@ -314,31 +314,31 @@ async function readToken() {
 }
 ```
 
-> Citas oficiales:
+> Official quotes:
 > - *"Large payloads can be rejected by the underlying platform. Historically, some iOS releases refused values above roughly 2048 bytes."*
 > - *"On Android … will not be preserved upon app uninstallation."*
 > - *"On iOS … will persist across app uninstallations if the app is reinstalled with the same bundle ID."*
-> - Límites de accesibilidad: `WHEN_UNLOCKED` (default), `AFTER_FIRST_UNLOCK`, `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY`.
-> - **Auto-backup Android:** excluir `SecureStore` del backup o las keys se invalidan.
+> - Accessibility limits: `WHEN_UNLOCKED` (default), `AFTER_FIRST_UNLOCK`, `WHEN_PASSCODE_SET_THIS_DEVICE_ONLY`.
+> - **Android auto-backup:** exclude `SecureStore` from backup or the keys are invalidated.
 
 ### AsyncStorage
 
 ```ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// helper puro
+// pure helper
 async function saveDraft(key, value) {
   await AsyncStorage.setItem(key, JSON.stringify(value));
 }
 ```
 
-> **NO usar para secretos.** *"On native platforms … you can secure things like access tokens locally using `expo-secure-store` … This is different to AsyncStorage which is not secure."*
+> **DO NOT use for secrets.** *"On native platforms … you can secure things like access tokens locally using `expo-secure-store` … This is different to AsyncStorage which is not secure."*
 
 ### MMKV
 
 > *"~30x faster than AsyncStorage"*; *"Fully synchronous calls, no async/await, no Promises, no Bridge."*
 
-Requiere `react-native >= 0.76` (v4) + `npx expo prebuild` (no corre en Expo Go puro).
+Requires `react-native >= 0.76` (v4) + `npx expo prebuild` (does not run in pure Expo Go).
 
 ```ts
 import { createMMKV, useMMKVString } from 'react-native-mmkv';
@@ -349,7 +349,7 @@ export const storage = createMMKV({
   encryptionType: 'AES-256',
 });
 
-// hook de UI — arrow function
+// UI hook — arrow function
 const useTheme = () => {
   const [theme, setTheme] = useMMKVString('theme');
   return { theme, setTheme };
@@ -358,7 +358,7 @@ const useTheme = () => {
 
 ### SQLite (`expo-sqlite`)
 
-API moderna con métodos nombrados (`runAsync` / `getFirstAsync` / `getAllAsync`), transacciones (`withTransactionAsync` / `withExclusiveTransactionAsync`), hooks (`useSQLiteContext`, `<SQLiteProvider>`), tagged template literals `sql\`...\``.
+Modern API with named methods (`runAsync` / `getFirstAsync` / `getAllAsync`), transactions (`withTransactionAsync` / `withExclusiveTransactionAsync`), hooks (`useSQLiteContext`, `<SQLiteProvider>`), tagged template literals `sql\`...\``.
 
 ```ts
 import * as SQLite from 'expo-sqlite';
@@ -379,7 +379,7 @@ await db.withTransactionAsync(async () => {
 });
 ```
 
-DevTools inspector: `Shift+M` en CLI → Open expo-sqlite.
+DevTools inspector: `Shift+M` in CLI → Open expo-sqlite.
 
 ### Drizzle ORM + Expo SQLite
 
@@ -393,22 +393,22 @@ const db = drizzle(expo);
 const getAllUsers = async () => db.select().from(users);
 ```
 
-Live queries con `useLiveQuery` requieren `enableChangeListener: true`. Necesita `drizzle-kit` + `babel-plugin-inline-import` + Metro config para bundlear migrations `.sql`.
+Live queries with `useLiveQuery` require `enableChangeListener: true`. Needs `drizzle-kit` + `babel-plugin-inline-import` + Metro config to bundle migrations `.sql`.
 
 ### WatermelonDB
 
-Requiere Babel con `["@babel/plugin-proposal-decorators", { "legacy": true }]` y opcional JSI. Versión actual 0.27.1. Pensado para apps con **sync engine propio** y queries reactivas; overkill si solo necesitas CRUD local.
+Requires Babel with `["@babel/plugin-proposal-decorators", { "legacy": true }]` and optional JSI. Current version 0.27.1. Designed for apps with their **own sync engine** and reactive queries; overkill if you only need local CRUD.
 
 ## 5. HTTP — fetch vs axios
 
-**Posición oficial:** La doc de Expo y los templates default no recomiendan axios sobre fetch. React 19 y Expo SDK 54+ vienen con `fetch` global disponible (Hermes / WHATWG Fetch). `fetch` es estándar, no requiere polyfill, soporta streams, AbortController, FormData, tipos `Request/Response` completos.
+**Official position:** The Expo docs and default templates do not recommend axios over fetch. React 19 and Expo SDK 54+ come with `fetch` globally available (Hermes / WHATWG Fetch). `fetch` is standard, requires no polyfill, supports streams, AbortController, FormData, full `Request/Response` types.
 
-**Cuándo usar axios:** si necesitas interceptores declarativos, transformación JSON automática, mejor DX para upload progress, o shape unificado de errores.
+**When to use axios:** if you need declarative interceptors, automatic JSON transformation, better DX for upload progress, or a unified error shape.
 
-### Patrón `fetch` + `AbortController` (default)
+### `fetch` + `AbortController` pattern (default)
 
 ```ts
-// helper puro (no UI)
+// pure helper (no UI)
 async function apiFetch(url, options = {}, timeoutMs = 10_000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -423,7 +423,7 @@ async function apiFetch(url, options = {}, timeoutMs = 10_000) {
 }
 ```
 
-### Patrón `axios` + interceptores
+### `axios` + interceptors pattern
 
 ```ts
 import axios from 'axios';
@@ -437,22 +437,22 @@ api.interceptors.request.use(cfg => {
 });
 ```
 
-### Retry, timeout, cancelación
+### Retry, timeout, cancellation
 
-- `fetch` → `AbortController`. Retry lo hace TanStack Query (`retry: 3`, backoff).
-- `axios` → `timeout`, `signal: controller.signal` (acepta `AbortController` desde 0.22), `adapter` custom, `axios-retry`.
+- `fetch` → `AbortController`. Retry is done by TanStack Query (`retry: 3`, backoff).
+- `axios` → `timeout`, `signal: controller.signal` (accepts `AbortController` since 0.22), custom `adapter`, `axios-retry`.
 
-## 6. Autenticación
+## 6. Authentication
 
-### `expo-auth-session` (OAuth/OIDC web-based)
+### `expo-auth-session` (web-based OAuth/OIDC)
 
-Reglas universales de la guía oficial:
-1. Llamar `WebBrowser.maybeCompleteAuthSession()` para cerrar el popup.
-2. Construir redirects con `AuthSession.makeRedirectUri()`.
-3. Usar `AuthSession.useAuthRequest()` (hook) — carga async sin bloquear.
-4. Esperar a `request` antes de habilitar el botón.
-5. En web solo invocar `promptAsync` desde interacción del usuario.
-6. **Expo Go no sirve para OAuth** → necesitas Development Build + scheme custom.
+Universal rules from the official guide:
+1. Call `WebBrowser.maybeCompleteAuthSession()` to close the popup.
+2. Build redirects with `AuthSession.makeRedirectUri()`.
+3. Use `AuthSession.useAuthRequest()` (hook) — async loading without blocking.
+4. Wait for `request` before enabling the button.
+5. On web only invoke `promptAsync` from user interaction.
+6. **Expo Go does not work for OAuth** → you need a Development Build + custom scheme.
 
 ```tsx
 import * as WebBrowser from 'expo-web-browser';
@@ -478,13 +478,13 @@ const useGitHubAuth = () => {
 };
 ```
 
-PKCE viene activado por default (`usePKCE: true`).
+PKCE is enabled by default (`usePKCE: true`).
 
 ### `expo-apple-authentication`
 
 > *"Any app that includes third-party authentication options **must** provide Apple authentication as an option to comply with App Store Review guidelines."*
 
-Plataformas: iOS, tvOS, Expo Go. **No Android, no web.**
+Platforms: iOS, tvOS, Expo Go. **Not Android, not web.**
 
 ```tsx
 import { FC } from 'react';
@@ -505,7 +505,7 @@ const SignInWithAppleButton: FC<{}> = () => (
           ],
         });
       } catch (e) {
-        if (e.code === 'ERR_REQUEST_CANCELED') { /* canceló */ }
+        if (e.code === 'ERR_REQUEST_CANCELED') { /* canceled */ }
       }
     }}
   />
@@ -514,66 +514,66 @@ const SignInWithAppleButton: FC<{}> = () => (
 export default SignInWithAppleButton;
 ```
 
-> ⚠️ `identityToken` es JWT; **verificar firma** con la public key de Apple. `user` (id estable) se guarda en SecureStore/backend. `fullName` y `email` **solo vienen en el primer login** — persistir desde el primer response.
+> ⚠️ `identityToken` is a JWT; **verify the signature** with Apple's public key. `user` (stable id) is stored in SecureStore/backend. `fullName` and `email` **only come in the first login** — persist from the first response.
 
 ### Google Sign-In
 
-La doc oficial recomienda:
-- `react-native-nitro-google-signin` — incluye **Android Credential Manager** gratis.
-- `@react-native-google-signin/google-signin` — Credential Manager solo en plan pago.
+The official docs recommend:
+- `react-native-nitro-google-signin` — includes **Android Credential Manager** for free.
+- `@react-native-google-signin/google-signin` — Credential Manager only on the paid plan.
 
 > *"The legacy Google Sign-In SDK for Android is deprecated and Google recommends migrating to Android Credential Manager."*
 
-Ambas requieren Development Build (no Expo Go) + `expo prebuild`. Para Android necesitas SHA-1 de Play App Signing (producción) y del `.apk`/`.aab` (testing) en Firebase / Google Cloud.
+Both require Development Build (not Expo Go) + `expo prebuild`. For Android you need the SHA-1 from Play App Signing (production) and from the `.apk`/`.aab` (testing) in Firebase / Google Cloud.
 
-### Almacenar la sesión
+### Store the session
 
-> *"Securely store the auth on your device"* → **`expo-secure-store`** (no AsyncStorage).
+> *"Securely store the auth on your device"* → **`expo-secure-store`** (NEVER AsyncStorage).
 
-## 7. Resumen rápido
+## 7. Quick summary
 
 ```
-¿El dato vive en un servidor?
-├─ Sí → TanStack Query v5
-│       ├─ lista paginada → useInfiniteQuery
-│       └─ escribe → useMutation + invalidateQueries
-└─ No → ¿es secreto? → expo-secure-store
-      └─ ¿es KV no sensible y pequeño? → AsyncStorage (o MMKV si necesitas sync/velocidad)
-         └─ ¿es relacional con joins/queries? → expo-sqlite (+ Drizzle)
-            └─ ¿tienes sync engine? → WatermelonDB
+Does the data live on a server?
+├─ Yes → TanStack Query v5
+│       ├─ paginated list → useInfiniteQuery
+│       └─ write → useMutation + invalidateQueries
+└─ No → is it a secret? → expo-secure-store
+      └─ is it a small non-sensitive KV? → AsyncStorage (or MMKV if you need sync/speed)
+         └─ is it relational with joins/queries? → expo-sqlite (+ Drizzle)
+            └─ do you have a sync engine? → WatermelonDB
 
-¿Necesitas formulario?
-└─ react-hook-form + Controller (RN) + validación nativa (rules={...})
-   Schema validation (Zod/Valibot/Yup) SOLO si el usuario lo pide
+Do you need a form?
+└─ react-hook-form + Controller (RN) + native validation (rules={...})
+   Schema validation (Zod/Valibot/Yup) ONLY if the user asks for it
 
-¿Necesitas estado UI compartido entre pantallas?
-└─ 1-2 valores que cambian raro → Context API
-   Estado complejo o cambia mucho → Zustand / Jotai
-   Equipo grande / debug estricto → Redux Toolkit
+Do you need shared UI state across screens?
+└─ 1-2 values that change rarely → Context API
+   Complex state or changes a lot → Zustand / Jotai
+   Large team / strict debug → Redux Toolkit
 
-¿Necesitas autenticación?
+Do you need authentication?
 ├─ OAuth/OIDC web → expo-auth-session
-├─ iOS nativo    → expo-apple-authentication (obligatorio si tienes otros providers)
-├─ Google        → @react-native-google-signin/google-signin o react-native-nitro-google-signin
-└─ Guardar tokens → expo-secure-store (NUNCA AsyncStorage)
+├─ iOS native    → expo-apple-authentication (mandatory if you have other providers)
+├─ Google        → @react-native-google-signin/google-signin or react-native-nitro-google-signin
+└─ Store tokens → expo-secure-store (NEVER AsyncStorage)
 ```
 
-## 8. Comandos de instalación
+## 8. Install commands
 
 ```sh
 # Server state
 npm i @tanstack/react-query
 
-# Forms (sin schema validation)
+# Forms (without schema validation)
 npm i react-hook-form
-# Schema validation (opt-in, solo si el usuario lo pide)
-npm i @hookform/resolvers zod        # o valibot / yup
+# Schema validation (opt-in, only if the user asks for it)
+npm i @hookform/resolvers zod        # or valibot / yup
 
-# Storage seguro / no sensible
+# Secure / non-sensitive storage
 npx expo install expo-secure-store
 npx expo install @react-native-async-storage/async-storage
 
-# Storage rápido (sync) — requiere prebuild
+# Fast (sync) storage — requires prebuild
 npx expo install react-native-mmkv react-native-nitro-modules
 npx expo prebuild
 
@@ -587,6 +587,6 @@ npx expo install expo-auth-session expo-crypto
 npx expo install expo-apple-authentication     # iOS-only
 npx expo install @react-native-google-signin/google-signin
 
-# Conectividad (para retry de TanStack Query)
+# Connectivity (for TanStack Query retry)
 npx expo install expo-network
 ```

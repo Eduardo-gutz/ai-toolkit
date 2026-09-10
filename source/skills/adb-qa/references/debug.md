@@ -1,208 +1,208 @@
 # Debug — logs, network, ANR/crash, performance
 
-## logcat — el 80% del debugging
+## logcat — 80% of debugging
 
-### Comandos esenciales
+### Essential commands
 
 ```bash
-# Ver todo (no lo hagas en producción: spam)
+# View everything (don't do this in production: spam)
 adb -s <serial> logcat
 
-# Filtrar por nivel
-adb -s <serial> logcat '*:E'                    # solo errores
+# Filter by level
+adb -s <serial> logcat '*:E'                    # errors only
 adb -s <serial> logcat '*:W'                    # warnings + errors
 adb -s <serial> logcat '*:I'                    # info+
 
-# Filtrar por tag
-adb -s <serial> logcat -s ReactNativeJS:V        # JS logs en RN
+# Filter by tag
+adb -s <serial> logcat -s ReactNativeJS:V        # JS logs in RN
 adb -s <serial> logcat -s ReactNative:V
 
-# Filtrar por package (Android 7+, API 24+)
+# Filter by package (Android 7+, API 24+)
 adb -s <serial> logcat --pid $(adb -s <serial> shell pidof com.egsolutions.zumapos)
 
-# Combinar filtros
+# Combine filters
 adb -s <serial> logcat *:E ReactNativeJS:V AndroidRuntime:V
 ```
 
-### Buffer estratégico
+### Strategic buffer
 
 ```bash
-adb -s <serial> logcat -b crash                # solo buffer de crashes
-adb -s <serial> logcat -b main                # buffer principal (default)
-adb -s <serial> logcat -b all                 # todos los buffers concatenados
+adb -s <serial> logcat -b crash                # crash buffer only
+adb -s <serial> logcat -b main                # main buffer (default)
+adb -s <serial> logcat -b all                 # all buffers concatenated
 ```
 
-### Operaciones útiles
+### Useful operations
 
 ```bash
-# Limpiar buffer antes de reproducir
+# Clear buffer before reproducing
 adb -s <serial> logcat -c
 
-# Leer buffer completo y salir
+# Read full buffer and exit
 adb -s <serial> logcat -d > logcat.txt
 
-# Logcat con timestamp formateado
+# Logcat with formatted timestamp
 adb -s <serial> logcat -v time -d
 
-# Formato JSON para parseo automático
+# JSON format for automatic parsing
 adb -s <serial> logcat -v json -d | jq 'select(.pid == 1234)'
 ```
 
-### Patrón de debugging típico
+### Typical debugging pattern
 
 ```bash
 adb -s <serial> logcat -c
-# <reproducir el bug en el device>
+# <reproduce the bug on the device>
 adb -s <serial> logcat -d -v time > logcat.txt
 grep -A 30 "FATAL EXCEPTION" logcat.txt
 ```
 
 ## Network
 
-### Reverse port forward (la app habla al host)
+### Reverse port forward (the app talks to the host)
 
-Crítico para development con Metro bundler:
+Critical for development with Metro bundler:
 
 ```bash
 adb -s <serial> reverse tcp:8081 tcp:8081    # device:8081 → host:8081
-adb -s <serial> reverse --list              # confirmar
-adb -s <serial> reverse --remove tcp:8081   # limpiar al terminar
+adb -s <serial> reverse --list              # confirm
+adb -s <serial> reverse --remove tcp:8081   # clean up when done
 ```
 
-Sin esto, la app en el device no puede alcanzar el Metro del host (que escucha en `localhost:8081`). En el emulador puedes usar `10.0.2.2:8081` en lugar del forward.
+Without this, the app on the device cannot reach the host's Metro (which listens on `localhost:8081`). On the emulator you can use `10.0.2.2:8081` instead of forward.
 
-### Forward port forward (host habla al device)
+### Forward port forward (host talks to device)
 
-Útil para conectar a un servidor embebido en la app o para `dumpsys` desde un puerto específico:
+Useful to connect to a server embedded in the app or to `dumpsys` from a specific port:
 
 ```bash
 adb -s <serial> forward tcp:9000 localabstract:chrome_devtools_remote_1234
 ```
 
-Donde `chrome_devtools_remote_<pid>` es el abstract socket que abre RN para Flipper / Chrome DevTools. Pega `localhost:9000` en Chrome DevTools.
+Where `chrome_devtools_remote_<pid>` is the abstract socket RN opens for Flipper / Chrome DevTools. Paste `localhost:9000` in Chrome DevTools.
 
-### Captura de tráfico con tcpdump
+### Traffic capture with tcpdump
 
-Requiere root o build debuggable. Para emulador:
+Requires root or debuggable build. For emulator:
 
 ```bash
-# El emulador expone qemu pipes para captura nativa
+# The emulator exposes qemu pipes for native capture
 adb -s <serial> shell "tcpdump -i any -w /sdcard/cap.pcap" &
-# <reproducir tráfico>
+# <reproduce traffic>
 adb -s <serial> pull /sdcard/cap.pcap .
-# Abrir con Wireshark localmente
+# Open with Wireshark locally
 ```
 
-Si tcpdump no está en el device, alternativa: configurar proxy:
+If tcpdump is not on the device, alternative: configure proxy:
 
 ```bash
 adb -s <serial> shell settings put global http_proxy 127.0.0.1:8888
-# luego corre mitmproxy local en :8888
+# then run mitmproxy locally on :8888
 ```
 
-## ANR y crashes
+## ANR and crashes
 
-### Detectar ANR (Application Not Responding)
+### Detect ANR (Application Not Responding)
 
 ```bash
 adb -s <serial> shell cat /data/anr/traces.txt
 ```
 
-Si el archivo no existe, no hay ANR reciente. Si existe, contiene el stack trace del thread principal.
+If the file does not exist, there is no recent ANR. If it exists, it contains the main thread's stack trace.
 
-### Tomstones (crashes nativos)
+### Tombstones (native crashes)
 
 ```bash
 adb -s <serial> shell ls /data/tombstones/
 adb -s <serial> pull /data/tombstones/
-adb -s <serial> shell tombstones    # si está disponible
+adb -s <serial> shell tombstones    # if available
 ```
 
-Los tombstones son para crashes en código nativo (C/C++, no JS). Para Zuma, normalmente no aplica — RN corre en Hermes/V8 sobre Java. Pero si integras alguna lib nativa con JSI, podrían aparecer.
+Tombstones are for crashes in native code (C/C++, not JS). For Zuma, normally does not apply — RN runs on Hermes/V8 over Java. But if you integrate some native lib with JSI, they could appear.
 
-### Crash log del sistema
+### System crash log
 
 ```bash
 adb -s <serial> logcat -b crash -d
 ```
 
-Busca la línea:
+Look for the line:
 ```
 FATAL EXCEPTION: main
 Process: com.egsolutions.zumapos, PID: 12345
 java.lang.RuntimeException: ...
 ```
 
-`AndroidRuntime` es el tag típico.
+`AndroidRuntime` is the typical tag.
 
-## Performance básico
+## Basic performance
 
-### Memoria
+### Memory
 
 ```bash
 adb -s <serial> shell dumpsys meminfo com.egsolutions.zumapos
 ```
 
-Output clave:
-- `TOTAL PSS`: RSS + swap compartido. **Métrica de memory pressure real.**
-- `Java Heap`: memoria Java asignada.
-- `Native Heap`: memoria nativa (Hermes, módulos nativos).
-- `Graphics`: memoria GPU (skia).
-- `Code`: memoria del código compilado.
+Key output:
+- `TOTAL PSS`: RSS + shared swap. **Real memory pressure metric.**
+- `Java Heap`: assigned Java memory.
+- `Native Heap`: native memory (Hermes, native modules).
+- `Graphics`: GPU memory (skia).
+- `Code`: compiled code memory.
 
-Si `TOTAL PSS` sube sin volver a bajar entre dos puntos del flujo, **probable leak**.
+If `TOTAL PSS` goes up without coming back down between two points in the flow, **likely leak**.
 
 ### GPU rendering time
 
 ```bash
-# Habilitar
+# Enable
 adb -s <serial> shell setprop debug.hwui.profile true
-# Reproducir flujo
+# Reproduce flow
 adb -s <serial> shell dumpsys gfxinfo com.egsolutions.zumapos reset
-# <flujo>
+# <flow>
 adb -s <serial> shell dumpsys gfxinfo com.egsolutions.zumapos > gfx.txt
 ```
 
-Luego en `gfx.txt` busca `Total frames rendered` y `95th percentile`. >16ms por frame significa drops.
+Then in `gfx.txt` look for `Total frames rendered` and `95th percentile`. >16ms per frame means drops.
 
-### CPU por proceso
+### CPU per process
 
 ```bash
 adb -s <serial> shell top -p $(adb -s <serial> shell pidof com.egsolutions.zumapos)
 ```
 
-Para log continuo (5 segundos):
+For continuous log (5 seconds):
 ```bash
 adb -s <serial> shell top -d 1 -n 5 -p $(adb -s <serial> shell pidof com.egsolutions.zumapos)
 ```
 
-Si CPU% se queda >50% en idle, hay un loop o animación descontrolada.
+If CPU% stays >50% at idle, there is a loop or uncontrolled animation.
 
-## Stress testing con `monkey`
+## Stress testing with `monkey`
 
-Disparar 500 eventos aleatorios:
+Fire 500 random events:
 ```bash
 adb -s <serial> shell monkey -p com.egsolutions.zumapos --throttle 100 -v 500
 ```
 
-`--throttle 100` = 100ms entre eventos (5x/seg). Reduce spam. Si la app crashea con monkey, hay problema de robustez general (no solo del flujo feliz).
+`--throttle 100` = 100ms between events (5x/sec). Reduces spam. If the app crashes with monkey, there is a general robustness problem (not just happy flow).
 
-`-s <seed>` permite reproducir la misma secuencia exacta — útil para repros de bugs aleatorios.
+`-s <seed>` allows reproducing the same exact sequence — useful for repros of random bugs.
 
-## Limpiar y reiniciar
+## Clean up and restart
 
 ```bash
-# Solo cache
+# Just cache
 adb -s <serial> shell pm clear com.egsolutions.zumapos
-# ^ equivalente a desinstalar + reinstalar sin perder la app
+# ^ equivalent to uninstall + reinstall without losing the app
 
-# Limpiar logs y reiniciar adb (raro necesario)
+# Clear logs and restart adb (rarely needed)
 adb kill-server && adb start-server
 ```
 
-Si el device está congelado:
+If the device is frozen:
 ```bash
 adb -s <serial> reboot
-# Esperamos ~30s a que vuelva
+# Wait ~30s for it to come back
 adb wait-for-device
 ```

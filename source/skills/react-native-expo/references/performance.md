@@ -1,31 +1,31 @@
-# Performance y New Architecture
+# Performance and New Architecture
 
-> **Fuentes oficiales:** https://reactnative.dev/docs/performance · https://reactnative.dev/docs/optimizing-flatlist-configuration · https://shopify.github.io/flash-list/ · https://docs.expo.dev/versions/latest/sdk/flash-list/ · https://docs.expo.dev/versions/latest/sdk/image/ · https://docs.swmansion.com/react-native-reanimated/ · https://docs.expo.dev/guides/new-architecture/
+> **Official sources:** https://reactnative.dev/docs/performance · https://reactnative.dev/docs/optimizing-flatlist-configuration · https://shopify.github.io/flash-list/ · https://docs.expo.dev/versions/latest/sdk/flash-list/ · https://docs.expo.dev/versions/latest/sdk/image/ · https://docs.swmansion.com/react-native-reanimated/ · https://docs.expo.dev/guides/new-architecture/
 
-## 1. Conceptos base oficiales
+## 1. Official base concepts
 
 > *"iOS and Android devices display at least 60 frames per second, which gives you and the UI system at most **16.67ms** to do all of the work needed to generate the static image (frame)… If you are unable to do the work necessary to generate that frame within the allotted time slot, then you will 'drop a frame' and the UI will appear unresponsive."*
 > — reactnative.dev/docs/performance
 
-Dos frame rates distintos:
+Two different frame rates:
 - **JS frame rate** (JS thread): render React, API calls, touch events.
-- **UI frame rate** (main thread): nativo. Transiciones de `@react-navigation/native-stack` viven aquí → animaciones nativas no se interrumpen por drops en JS thread.
+- **UI frame rate** (main thread): native. Transitions from `@react-navigation/native-stack` live here → native animations are not interrupted by drops in the JS thread.
 
-## 2. Anti-patrones oficiales (lista explícita)
+## 2. Official anti-patterns (explicit list)
 
-| # | Anti-patrón | Solución oficial |
+| # | Anti-pattern | Official solution |
 |---|---|---|
-| 1 | Probar perf en `dev=true` | *"Always make sure to test performance in release builds"* |
-| 2 | `console.log` en producción | *"can cause a big bottleneck in the JavaScript thread"* → instalar `babel-plugin-transform-remove-console` |
-| 3 | `FlatList` sin `getItemLayout` | *"skipping measurement of the rendered items"* |
-| 4 | JS thread saturado en transición/animation | Deferir trabajo (`requestIdleCallback`) o `LayoutAnimation` (afectado por main thread, no JS) |
-| 5 | Mover view con alpha compositing (Android) | Usar `renderToHardwareTextureAndroid`; iOS ya tiene `shouldRasterizeIOS` por defecto |
-| 6 | Animar `width`/`height` de `<Image>` | En iOS se re-crop + re-scale cada frame → usar `transform: [{scale}]` |
-| 7 | `onPress` pesado bloqueando feedback | Envolver trabajo en `requestAnimationFrame` |
+| 1 | Test perf in `dev=true` | *"Always make sure to test performance in release builds"* |
+| 2 | `console.log` in production | *"can cause a big bottleneck in the JavaScript thread"* → install `babel-plugin-transform-remove-console` |
+| 3 | `FlatList` without `getItemLayout` | *"skipping measurement of the rendered items"* |
+| 4 | Saturated JS thread on transition/animation | Defer work (`requestIdleCallback`) or `LayoutAnimation` (main thread, not JS) |
+| 5 | Move view with alpha compositing (Android) | Use `renderToHardwareTextureAndroid`; iOS already has `shouldRasterizeIOS` by default |
+| 6 | Animate `width`/`height` of `<Image>` | On iOS it re-crops + re-scales every frame → use `transform: [{scale}]` |
+| 7 | Heavy `onPress` blocking feedback | Wrap work in `requestAnimationFrame` |
 
-## 3. Listas grandes: FlashList v2 vs FlatList
+## 3. Large lists: FlashList v2 vs FlatList
 
-### Decisión oficial
+### Official decision
 
 > *"If your `FlatList` is rendering slowly, be sure that you've implemented `getItemLayout`… There are also other third-party list libraries that are optimized for performance, including **FlashList** and Legend List."*
 > — reactnative.dev/docs/performance
@@ -33,15 +33,15 @@ Dos frame rates distintos:
 > *"FlashList recycles components under the hood to maximize performance."*
 > — shopify.github.io/flash-list/
 
-**Regla práctica:**
-- **FlatList** OK si: listas chicas (<~50 items), `getItemLayout` conocido, no hay heterogeneidad.
-- **FlashList** recomendado si: listas grandes, longitudes variables, mezcla de tipos, Android low-end.
+**Practical rule:**
+- **FlatList** OK if: small lists (<~50 items), known `getItemLayout`, no heterogeneity.
+- **FlashList** recommended if: large lists, variable lengths, mixed types, low-end Android.
 
-### Métricas oficiales Shopify
+### Official Shopify metrics
 
 > *"FPS in UI thread: **up to 5x** FlashList vs FlatList · FPS in JS thread: **up to 10x** · Average FPS on 60FPS Android Moto G10 device."*
 
-### Snippet mínimo
+### Minimum snippet
 
 ```tsx
 import { FC } from 'react';
@@ -52,40 +52,40 @@ const MyList: FC<{}> = () => (
 );
 ```
 
-### Migración desde FlatList — checklist oficial
+### Migration from FlatList — official checklist
 
-1. Cambiar `FlatList` → `FlashList`.
-2. **Importante:** eliminar `key` props explícitos en `renderItem` (usa `useMappingHelper` si haces `.map()` dentro).
-3. Auditar `useState` en items → reciclarán con datos diferentes (ver [Recycling](https://shopify.github.io/flash-list/docs/recycling)).
-4. Pasar tipos heterogéneos con `getItemType` → mejora reciclaje.
-5. **No testear perf con JS dev mode on** (FlashList aparece más lento por el render buffer pequeño).
-6. **Memoizar props es más importante en v2** (v1 era selectivo, v2 re-renderiza más).
-7. `keyExtractor` siempre con v2 (evita glitches al ir hacia arriba).
+1. Change `FlatList` → `FlashList`.
+2. **Important:** remove explicit `key` props on `renderItem` (use `useMappingHelper` if you do `.map()` inside).
+3. Audit `useState` on items → they will be recycled with different data (see [Recycling](https://shopify.github.io/flash-list/docs/recycling)).
+4. Pass heterogeneous types with `getItemType` → improves recycling.
+5. **Do not test perf with JS dev mode on** (FlashList appears slower due to the small render buffer).
+6. **Memoizing props is more important in v2** (v1 was selective, v2 re-renders more).
+7. `keyExtractor` always with v2 (avoids glitches when scrolling up).
 
-### Props de FlatList NO soportadas en FlashList v2
+### FlatList props NOT supported in FlashList v2
 
 `columnWrapperStyle`, `debug`, `listKey`, `disableVirtualization`, **`getItemLayout`**, **`initialNumToRender`**, **`maxToRenderPerBatch`**, `recordInteraction`, `setNativeProps`, **`updateCellsBatchingPeriod`**, `onScrollToIndexFailed`, **`windowSize`**.
 
 > *"We don't currently plan to implement these props."*
 
-### Hooks oficiales FlashList v2
+### Official FlashList v2 hooks
 
-- `useLayoutState(initialState)` — comunica cambios de tamaño a FlashList.
-- `useRecyclingState(initial, deps, resetCallback)` — resetea state cuando deps cambian.
-- `useMappingHelper()` — devuelve `getMappingKey(index, itemKey)` para `.map()` internos.
-- `useFlashListContext()` — expone `ref` de FlashList y ScrollView.
+- `useLayoutState(initialState)` — communicates size changes to FlashList.
+- `useRecyclingState(initial, deps, resetCallback)` — resets state when deps change.
+- `useMappingHelper()` — returns `getMappingKey(index, itemKey)` for internal `.map()`.
+- `useFlashListContext()` — exposes the `ref` of FlashList and ScrollView.
 
-## 4. FlatList — props para tuning (cuando la usas)
+## 4. FlatList — tuning props (when you use it)
 
 | Prop | Default | Trade-off |
 |---|---|---|
-| `removeClippedSubviews` | `true` Android, `false` iOS | Pros: menos trabajo en main thread · Cons: bugs con transforms/absolute positioning (iOS) |
-| `maxToRenderPerBatch` | `10` | Más = menos blanks · Menos = mejor responsiveness |
-| `updateCellsBatchingPeriod` | `50` ms | Combinar con `maxToRenderPerBatch` para tunear |
-| `initialNumToRender` | `10` | Cubrir el viewport exacto = big boost en primer render |
-| `windowSize` | `21` (10 + 1 + 10 viewports) | Mayor = menos blanks pero más memoria |
+| `removeClippedSubviews` | `true` Android, `false` iOS | Pros: less work on main thread · Cons: bugs with transforms/absolute positioning (iOS) |
+| `maxToRenderPerBatch` | `10` | More = fewer blanks · Less = better responsiveness |
+| `updateCellsBatchingPeriod` | `50` ms | Combine with `maxToRenderPerBatch` to tune |
+| `initialNumToRender` | `10` | Cover the exact viewport = big first-render boost |
+| `windowSize` | `21` (10 + 1 + 10 viewports) | Larger = fewer blanks but more memory |
 
-### Patrón `getItemLayout` + `memo` + `keyExtractor`
+### `getItemLayout` + `memo` + `keyExtractor` pattern
 
 ```tsx
 const renderItem = useCallback(({ item }) => (
@@ -105,13 +105,13 @@ const MyListItem = memo(
 />
 ```
 
-## 5. Imágenes — `expo-image`
+## 5. Images — `expo-image`
 
 > *"Designed for speed · Disk and memory caching · BlurHash & ThumbHash · Transitions (no more flickering) · CSS `object-fit`/`object-position` semantics · cross-platform."*
 
-Native engines: `SDWebImage` (iOS) y `Glide` (Android).
+Native engines: `SDWebImage` (iOS) and `Glide` (Android).
 
-### Snippet oficial
+### Official snippet
 
 ```tsx
 import { Image } from 'expo-image';
@@ -127,60 +127,60 @@ const blurhash = '|rF?hV%2WCj[ayj[a|j[az_NaeWBj@ayfRayfQfQM{M|azj[azf6fQfQfQIpWX
 />
 ```
 
-### Props clave oficiales
+### Key official props
 
-| Prop | Default | Notas |
+| Prop | Default | Notes |
 |---|---|---|
 | `cachePolicy` | `'disk'` | `'none'` / `'disk'` / `'memory'` / `'memory-disk'` |
-| `contentFit` | `'cover'` | Mapea a CSS `object-fit` |
-| `transition` | — | Number (cross-dissolve duration ms) u objeto `{effect, duration, timing}` |
+| `contentFit` | `'cover'` | Maps to CSS `object-fit` |
+| `transition` | — | Number (cross-dissolve duration ms) or object `{effect, duration, timing}` |
 | `placeholder` | — | BlurHash string, ThumbHash, ImageSource, array |
-| `placeholderContentFit` | `'scale-down'` | **Default distinto del `contentFit`** — setear igual para evitar flickering |
+| `placeholderContentFit` | `'scale-down'` | **Different default from `contentFit`** — set them equal to avoid flickering |
 | `priority` | `'normal'` | `'low'` / `'normal'` / `'high'` |
-| `recyclingKey` | `null` | **Crítico para FlashList**: resetea el view a blank antes de recargar |
-| `allowDownscaling` | `true` | Desactivar = memoria ↑ pero resize más smooth |
-| `tintColor` | — | Para template images |
+| `recyclingKey` | `null` | **Critical for FlashList**: resets the view to blank before reloading |
+| `allowDownscaling` | `true` | Disable = memory ↑ but resize smoother |
+| `tintColor` | — | For template images |
 
-### Métodos estáticos
+### Static methods
 
 - `Image.prefetch(urls, cachePolicy)` — preload; default `memory-disk`.
 - `Image.clearDiskCache()` / `clearMemoryCache()` — async, returns `Promise<boolean>`.
-- `Image.generateBlurhashAsync(source, [components])` — para generar placeholder server-side.
-- `Image.writeToCacheAsync(source, cacheKey)` — seedear cache con archivo local.
+- `Image.generateBlurhashAsync(source, [components])` — to generate placeholder server-side.
+- `Image.writeToCacheAsync(source, cacheKey)` — seed the cache with a local file.
 - `Image.getCachePathAsync(cacheKey)`.
-- `Image.loadAsync(source, options)` — carga a memoria, retorna `ImageRef`.
+- `Image.loadAsync(source, options)` — loads into memory, returns `ImageRef`.
 - `useImage(source, options, dependencies)` — hook.
 
-### Anti-patrones oficiales
+### Official anti-patterns
 
 > *"The default value for placeholder's content fit is `'scale-down'`, which differs from the source image's default value. Using a lower-resolution placeholder may cause flickering due to scaling differences between it and the final image. To prevent this, you can set the `placeholderContentFit` to match the `contentFit` value."*
 
-> ⚠️ `useImage` para imágenes grandes sin especificar size constraints puede causar crashes por memoria. Usar `maxWidth` o `maxHeight`.
+> ⚠️ `useImage` for large images without specifying size constraints can cause memory crashes. Use `maxWidth` or `maxHeight`.
 
-## 6. Animaciones — Reanimated 4.x
+## 6. Animations — Reanimated 4.x
 
 > ⚠️ *"Reanimated 4.x works **only with the React Native New Architecture (Fabric)**. If your app still uses the old architecture, you can use Reanimated in version 3 (which is no longer actively maintained)."*
 
-### Instalación
+### Installation
 
 ```sh
 npm install react-native-reanimated
-npm install react-native-worklets   # ← NUEVO en v4, separado
-npx expo prebuild                   # ← regenera ios/android
+npm install react-native-worklets   # ← NEW in v4, separate
+npx expo prebuild                   # ← regenerates ios/android
 ```
 
-### Cambios breaking v3 → v4
+### Breaking changes v3 → v4
 
-| Cambio | v3 | v4 |
+| Change | v3 | v4 |
 |---|---|---|
-| Plugin Babel | `react-native-reanimated/plugin` | `react-native-worklets/plugin` (debe ir **último**) |
-| Worklets | parte de reanimated | paquete separado `react-native-worklets` |
+| Babel plugin | `react-native-reanimated/plugin` | `react-native-worklets/plugin` (must be **last**) |
+| Worklets | part of reanimated | separate `react-native-worklets` package |
 | Threading | `runOnJS(fn)(args)` | `scheduleOnRN(fn, args)` |
 | | `runOnUI(fn)(args)` | `scheduleOnUI(fn, args)` |
-| Gesture | `useAnimatedGestureHandler` | **`removed`** → Gesture API v2 de Gesture Handler |
-| `useScrollViewOffset` | — | renombrado a `useScrollOffset` |
-| `withSpring` defaults | — | reemplazados; usar `Reanimated3DefaultSpringConfig` import para legacy |
-| New Arch | opcional | **requerido** |
+| Gesture | `useAnimatedGestureHandler` | **`removed`** → Gesture API v2 from Gesture Handler |
+| `useScrollViewOffset` | — | renamed to `useScrollOffset` |
+| `withSpring` defaults | — | replaced; use `Reanimated3DefaultSpringConfig` import for legacy |
+| New Arch | optional | **required** |
 
 ### `useSharedValue` + `useAnimatedStyle`
 
@@ -198,15 +198,15 @@ const animatedStyle = useAnimatedStyle(() => ({
 <Animated.View style={animatedStyle} />;
 ```
 
-### Anti-patrones oficiales Reanimated 4
+### Official Reanimated 4 anti-patterns
 
-- ❌ Usar v4 en Legacy Architecture → no funciona.
-- ❌ `'react-native-reanimated/plugin'` (renombrado) → ahora `'react-native-worklets/plugin'`.
-- ❌ `runOnJS` / `runOnUI` con doble invocación → API cambió a `scheduleOnRN(fn, args)`.
-- ❌ `useAnimatedGestureHandler` → removido; migrar a Gesture API v2.
-- ❌ Babel plugin antes que otros plugins → *"has to be listed last"*.
+- ❌ Use v4 in Legacy Architecture → does not work.
+- ❌ `'react-native-reanimated/plugin'` (renamed) → now `'react-native-worklets/plugin'`.
+- ❌ `runOnJS` / `runOnUI` with double invocation → API changed to `scheduleOnRN(fn, args)`.
+- ❌ `useAnimatedGestureHandler` → removed; migrate to Gesture API v2.
+- ❌ Babel plugin before other plugins → *"has to be listed last"*.
 
-## 7. New Architecture — estado SDK 54+
+## 7. New Architecture — SDK 54+ status
 
 > *"SDK 55 and later run entirely on the New Architecture. The New Architecture is always enabled and cannot be disabled. If you need to use the legacy architecture, use SDK 54 or earlier."*
 
@@ -218,37 +218,37 @@ const animatedStyle = useAnimatedStyle(() => ({
 
 > *"Expo Go only supports the New Architecture."*
 
-### Qué incluye
+### What it includes
 
-- **Fabric:** nuevo renderer (reemplaza a Paper).
-- **TurboModules:** módulos nativos con carga lazy y type safety via codegen.
-- **Bridgeless:** sin bridge, comunicación sync entre JS y native.
-- **Full support for Suspense** (no en legacy).
+- **Fabric:** new renderer (replaces Paper).
+- **TurboModules:** native modules with lazy loading and type safety via codegen.
+- **Bridgeless:** no bridge, sync communication between JS and native.
+- **Full support for Suspense** (not in legacy).
 - **New CSS features** (RN 0.77+).
 
-### Habilitar / deshabilitar (configuración oficial)
+### Enable / disable (official configuration)
 
 ```json
-// app.json — SDK 54 todavía permite togglear
+// app.json — SDK 54 still allows toggling
 { "expo": { "newArchEnabled": true } }
 ```
 
-> En SDK 55+, este setting es no-op. *"this setting will be ignored"*.
+> In SDK 55+, this setting is a no-op. *"this setting will be ignored"*.
 
-### Compatibilidad — librerías marcadas oficialmente como incompatibles / a migrar
+### Compatibility — libraries officially marked as incompatible / to migrate
 
-| ❌ Antes | ✅ Ahora |
+| ❌ Before | ✅ Now |
 |---|---|
-| `react-native-maps` (sin interop) | `expo-maps` o `@react-native-maps/react-native-maps` 1.21+ |
+| `react-native-maps` (without interop) | `expo-maps` or `@react-native-maps/react-native-maps` 1.21+ |
 | `@stripe/react-native` (<0.45) | `@stripe/react-native` ≥0.45 |
 | `@react-native-community/masked-view` | `@react-native-masked-view/masked-view` |
 | `@react-native-community/clipboard` | `@react-native-clipboard/clipboard` |
 | `rn-fetch-blob` | `react-native-blob-util` |
 | `react-native-fs` | `expo-file-system` |
 | `react-native-geolocation-service` | `expo-location` |
-| `react-native-datepicker` | `react-native-date-picker` o `@react-native-community/datetimepicker` |
+| `react-native-datepicker` | `react-native-date-picker` or `@react-native-community/datetimepicker` |
 
-### Validar
+### Validate
 
 ```sh
 npx expo-doctor@latest
@@ -256,26 +256,26 @@ npx expo-doctor@latest
 
 > *"Run `npx expo-doctor` to check your dependencies against the data in React Native Directory."*
 
-### Anti-patrones oficiales New Arch
+### Official New Arch anti-patterns
 
-- ❌ Setear `newArchEnabled: false` en SDK 55+ → **no-op**.
-- ❌ Asumir que FlashList v1 funciona en New Arch → **usar FlashList v2**.
-- ❌ Usar Reanimated 3 con New Arch → funciona, pero v4 está optimizado; v3 no recibe features nuevas.
-- ❌ Esperar que todas las third-party libs funcionen sin cambios → revisar interop layer.
+- ❌ Set `newArchEnabled: false` in SDK 55+ → **no-op**.
+- ❌ Assume FlashList v1 works in New Arch → **use FlashList v2**.
+- ❌ Use Reanimated 3 with New Arch → it works, but v4 is optimized; v3 does not get new features.
+- ❌ Expect all third-party libs to work without changes → check the interop layer.
 
 ## 8. Hermes vs JSC
 
-No hay página oficial comparativa en reactnative.dev. **Hermes es el default desde RN 0.70** (abril 2022) y la guía de performance lo asume. Comunidad reporta ~50% mejor startup time y menor memoria, pero **no es un claim oficial de RN**.
+There is no official comparison page on reactnative.dev. **Hermes is the default since RN 0.70** (April 2022) and the performance guide assumes it. The community reports ~50% better startup time and lower memory, but **it is not an official RN claim**.
 
 ## 9. Debugging
 
-| Herramienta | Cuándo |
+| Tool | When |
 |---|---|
-| `npx expo run:android` / `run:ios` | Compila nativo, instala, arranca Metro |
-| `npx expo start` | Solo Metro (cambios JS/TS) |
-| `expo-dev-client` | Dev build con UI/debugging tools |
+| `npx expo run:android` / `run:ios` | Compiles native, installs, starts Metro |
+| `npx expo start` | Metro only (JS/TS changes) |
+| `expo-dev-client` | Dev build with UI/debugging tools |
 | `npx react-devtools` | Standalone React DevTools |
 | Chrome DevTools via `chrome://inspect` | Hermes JS thread inspection |
-| **No usar Flipper** | Deprecado por RN core, reemplazado por React DevTools + Expo Dev Tools |
+| **Do not use Flipper** | Deprecated by RN core, replaced by React DevTools + Expo Dev Tools |
 
-**Sentry** (`@sentry/react-native`) está recomendado oficialmente para error tracking; viene en el `transformIgnorePatterns` default de `jest-expo`.
+**Sentry** (`@sentry/react-native`) is officially recommended for error tracking; it comes in the default `transformIgnorePatterns` of `jest-expo`.

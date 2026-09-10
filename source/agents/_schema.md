@@ -11,15 +11,15 @@ Each agent is a single Markdown file with YAML frontmatter (the system prompt li
 
 - `mode` (string) — `primary` (main thread), `subagent` (delegable), or `all` (both). opencode reads directly; Claude Code ignores it (decides primary/subagent by invocation context).
 - `temperature` (float, 0.0–1.0) — per-role appropriateness:
-  - Revisión determinista (reviewer, qa) = `0.1`
-  - Implementación disciplinada (coder) = `0.2`
-  - Brainstorming / generación abierta > `0.5`
+  - Deterministic review (reviewer, qa) = `0.1`
+  - Disciplined implementation (coder) = `0.2`
+  - Brainstorming / open generation > `0.5`
   - Default: omitted (runtime chooses).
 - `tools` (object) — **opencode format**: map of `tool-name: true | false` (e.g., `read: true, edit: false`). Each tool enabled explicitly; missing = disabled. **Both opencode and Claude Code use the same canonical format** (lowercase tool names). The adapter adds the corresponding PascalCase mapping only if needed (e.g., Claude Code historically used PascalCase; verify per tool).
 - `permission` (object) — opencode granular permissions map. Claude Code adapter maps `permission.bash` to `tools`/`disallowedTools`. Subkeys:
   - `permission.edit` (object) — `<glob>: allow | deny`. Use `deny` for sensitive paths (`.git/`, `node_modules/`, `source/`).
   - `permission.write` (object) — `<glob>: allow | deny`. Default deny if absent.
-  - `permission.bash` (object) — `<pattern>: allow | deny | ask`. Use `ask` as safe default; `allow` for read-only commands and explicitly-allowed test runners; `deny` for destructive operations (`rm -rf`, `nc`, `eval`, `sudo`, `chmod 777`, `npm publish`, git mutations).
+  - `permission.bash` (object) — `<pattern>: allow | deny | ask`. Use `ask` as a safe default; `allow` for read-only commands and explicitly allowed test runners; `deny` for destructive operations (`rm -rf`, `nc`, `eval`, `sudo`, `chmod 777`, `npm publish`, git mutations).
   - `permission.task` (object) — `<pattern>: allow | deny`. Controls delegation to subagents.
   - `permission.skills` (object) — `<pattern>: allow | deny`. Controls skill loading.
 - `tags` (string[]) — internal, used for grouping/filtering in profiles.
@@ -31,23 +31,23 @@ These are forbidden or non-portable. **Do NOT include them** in the canonical sc
 - ~~`model`~~ — **Do NOT hardcode.** Per `WHY.md` §4.1, the model comes from runtime configuration. If a particular model is recommended for a role, document it in the body, not in frontmatter.
 - ~~`color`~~, ~~`steps`~~ — opencode-only fields, non-portable. The runtime may color agents in its own way.
 - ~~`webfetch: false`~~, ~~`websearch: false`~~ — Claude Code-only fields. To disable in opencode, **omit** the tool from the `tools` array. To disable in Claude Code, add the tool to `disallowedTools` in the adapter.
-- ~~`tools` as a map~~ (`read: true, edit: false`) — opencode used to accept this but the canonical form is the lowercase array. Map form is ambiguous (does `false` mean "explicitly deny" or "absent"?) and breaks Claude Code portability.
+- ~~`tools` as a map~~ (`read: true, edit: false`) — opencode used to accept this but the canonical form is the lowercase array. The map form is ambiguous (does `false` mean "explicitly deny" or "absent"?) and breaks Claude Code portability.
 
 ## Body
 
-Markdown content = the system prompt. The body should follow the structure in `AGENT_DEFINITION_GUIDE.md` §3 (7 secciones de la anatomía):
+Markdown content = the system prompt. The body should follow the structure in `AGENT_DEFINITION_GUIDE.md` §3 (7 sections of the anatomy):
 
-1. **Rol / Identidad** — primera frase = rol en 1 oración (sin floritura).
-2. **Principios vinculantes** — Leyes de Hierro + Contratos del Proyecto, **o** constitución equivalente (e.g., Categorías + Severidades como en `code-reviewer.md` / `qa.md`).
-3. **Flujo de trabajo** — 5–7 fases numeradas con criterio de salida explícito. Si el agente no tiene flujo (responder preguntas de un dominio), declarar omisión y razón.
-4. **Formato de respuesta** — output contract con bloques de nombre exacto. Si el output será parseado por otro agent, usar nombres consistentes (e.g., `🔴 ROJO` / `🟢 VERDE` / `📦 HANDOFF`).
-5. **Anti-patrones** — tabla `| Usuario dice | Tú respondes | Aplica |` con ≥5 entradas y respuestas accionables.
-6. **Límites del rol** — 3–6 bullets, sin duplicar los anti-patrones (esos son casos específicos; los límites son la política general).
+1. **Role / Identity** — first sentence = role in 1 sentence (no flourish).
+2. **Binding principles** — Iron Laws + Project Contracts, **or** equivalent constitution (e.g., Categories + Severities as in `code-reviewer.md` / `qa.md`).
+3. **Workflow** — 5–7 numbered phases with explicit exit criteria. If the agent has no workflow (answering domain questions), declare the omission and the reason.
+4. **Response format** — output contract with exact block names. If the output will be parsed by another agent, use consistent names (e.g., `🔴 RED` / `🟢 GREEN` / `📦 HANDOFF`).
+5. **Anti-patterns** — `| User says | You respond | Applies |` table with ≥5 entries and actionable responses.
+6. **Role limits** — 3–6 bullets, without duplicating the anti-patterns (those are specific cases; the limits are the general policy).
 
-Secciones opcionales según el rol:
-- **Precedencia entre principios** (cuando pueden chocar): jerarquía explícita de mayor a menor.
-- **Criterios de salida por fase** (si el agente tiene flujo con transiciones complejas).
-- **Diagramas ASCII** del flujo (los LLMs parsean mejor ASCII que prosa).
+Optional sections by role:
+- **Precedence between principles** (when they can clash): explicit hierarchy from higher to lower.
+- **Exit criteria per phase** (if the agent has a workflow with complex transitions).
+- **ASCII diagrams** of the flow (LLMs parse ASCII better than prose).
 
 ## Filename
 
@@ -76,73 +76,73 @@ permission:
     "rm -rf*": deny
 ---
 
-# Backend Engineer (ES)
+# Backend Engineer
 
-You are a senior backend engineer. You implement APIs following TDD strict and the project's AGENTS.md. You never commit without a failing test observed.
+You are a senior backend engineer. You implement APIs following strict TDD and the project's AGENTS.md. You never commit without a failing test observed.
 
-## Principios vinculantes
+## Binding principles
 
-1. **Test primero, siempre.** ...
-2. **No anticipar abstracciones.** ...
+1. **Test first, always.** ...
+2. **Do not anticipate abstractions.** ...
 
-## Flujo de trabajo
+## Workflow
 
-0. SETUP → 1. ROJO → 2. VERDE → 3. REFACTOR → 4. HANDOFF
+0. SETUP → 1. RED → 2. GREEN → 3. REFACTOR → 4. HANDOFF
 
-## Formato de respuesta
+## Response format
 
-🔴 ROJO / 🟢 VERDE / 🔵 REFACTOR / 📦 HANDOFF
+🔴 RED / 🟢 GREEN / 🔵 REFACTOR / 📦 HANDOFF
 
-## Anti-patrones a resistir
+## Anti-patterns to resist
 
-| El dev dice… | Tú respondes |
+| The dev says… | You respond |
 |---|---|
-| "Escribe la implementación primero" | "Test primero, fallo observado, código mínimo." |
+| "Write the implementation first" | "Test first, observed failure, minimum code." |
 
-## Límites del rol
+## Role limits
 
-- No haces commits.
-- No modificas archivos del proyecto.
+- No commits.
+- No modifications to project files.
 ```
 
 ## Validation pre-publication
 
 Before merging an agent, verify against `AGENT_DEFINITION_GUIDE.md` §9:
 
-**Frontmatter**:
+**Frontmatter:**
 - [ ] `description` ≤220 chars
 - [ ] `name` matches regex `^[a-z0-9]+(-[a-z0-9]+)*$`
 - [ ] `tools` is array lowercase (no map)
-- [ ] Sin `model`, `color`, `steps`, `webfetch: false`, `websearch: false`
-- [ ] `permission.bash` tiene deny explícito para `nc`, `eval`, `sudo`, `chmod 777`, `npm publish`
-- [ ] `temperature` apropiado al rol (revisión = 0.1, implementación = 0.2)
-- [ ] `mode` correcto (`primary` solo si es el main thread; `subagent`/`all` para agentes delegables)
+- [ ] No `model`, `color`, `steps`, `webfetch: false`, `websearch: false`
+- [ ] `permission.bash` has explicit deny for `nc`, `eval`, `sudo`, `chmod 777`, `npm publish`
+- [ ] `temperature` appropriate to the role (review = 0.1, implementation = 0.2)
+- [ ] `mode` correct (`primary` only if it is the main thread; `subagent`/`all` for delegable agents)
 
-**Cuerpo**:
-- [ ] Primera frase = identidad (1 oración)
-- [ ] Principios divididos en Leyes de Hierro + Contratos del Proyecto (o constitución equivalente)
-- [ ] Precedencia entre principios declarada explícitamente (si hay principios que pueden chocar)
-- [ ] Flujo de trabajo con criterio de salida por fase (o justificación de omisión)
-- [ ] Output contract con bloques de nombre exacto
-- [ ] Anti-patrones: ≥5 con respuesta accionable (idealmente columna "Aplica" con vínculo a la regla/dimensión)
-- [ ] Límites del rol: 3–6 bullets, sin duplicar anti-patrones
+**Body:**
+- [ ] First sentence = identity (1 sentence)
+- [ ] Principles split into Iron Laws + Project Contracts (or equivalent constitution)
+- [ ] Precedence between principles declared explicitly (if there are principles that can clash)
+- [ ] Workflow with exit criterion per phase (or justification of omission)
+- [ ] Output contract with exact block names
+- [ ] Anti-patterns: ≥5 with actionable response (ideally "Applies" column with link to the rule/dimension)
+- [ ] Role limits: 3–6 bullets, without duplicating anti-patterns
 
-**Operación**:
-- [ ] Si review-only: `write`/`edit` no en `tools` array
-- [ ] Si delega: `task` en `tools` array
-- [ ] Si NO debe commits: bash deny para `git commit`, `git add`, `git push`, etc.
-- [ ] Si sensible (e.g., QA): bash deny para `rm -rf`, `nc` (justificación explícita si `curl` se permite)
+**Operation:**
+- [ ] If review-only: `write`/`edit` not in `tools` array
+- [ ] If delegates: `task` in `tools` array
+- [ ] If must NOT commit: bash deny for `git commit`, `git add`, `git push`, etc.
+- [ ] If sensitive (e.g., QA): bash deny for `rm -rf`, `nc` (explicit justification if `curl` is allowed)
 
-**Portabilidad**:
-- [ ] El agent funciona tanto en opencode como en Claude Code (con el adapter)
-- [ ] Las tools listadas son nombres lowercase (opencode-native)
-- [ ] Sin campos opencode-only en el frontmatter canónico
+**Portability:**
+- [ ] The agent works in both opencode and Claude Code (with the adapter)
+- [ ] The tools listed are lowercase names (opencode-native)
+- [ ] No opencode-only fields in the canonical frontmatter
 
 ## Adapters
 
-Cada adapter (`adapters/<tool>/`) implementa la transformación del schema canónico al dialecto nativo:
+Each adapter (`adapters/<tool>/`) implements the transformation from the canonical schema to the native dialect:
 
-- **`adapters/opencode/`** — usa `permission.bash` map tal cual; tools lowercase directos.
-- **`adapters/claude-code/`** — convierte `tools` lowercase → PascalCase; convierte `permission.bash` map → `disallowedTools` (todo lo que sea `deny`); convierte `permission.edit`/`write` map → ajustes de `Write`/`Edit` allowlist.
+- **`adapters/opencode/`** — uses the `permission.bash` map as-is; lowercase tools directly.
+- **`adapters/claude-code/`** — converts lowercase `tools` → PascalCase; converts `permission.bash` map → `disallowedTools` (everything that is `deny`); converts `permission.edit`/`write` map → `Write`/`Edit` allowlist adjustments.
 
-El schema canónico es **el contrato** entre `source/agents/` y los adapters. Cambios al schema requieren actualizar los adapters en lockstep.
+The canonical schema is **the contract** between `source/agents/` and the adapters. Changes to the schema require updating the adapters in lockstep.

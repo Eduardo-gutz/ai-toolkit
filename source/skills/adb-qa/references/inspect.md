@@ -1,8 +1,8 @@
 # Inspect — UI tree, screenshots, filesystem, SQLite
 
-## UI tree con uiautomator
+## UI tree with uiautomator
 
-El modo más rápido para mapear coordenadas y elementos visibles.
+The fastest way to map coordinates and visible elements.
 
 ```bash
 adb -s <serial> shell uiautomator dump
@@ -10,17 +10,17 @@ adb -s <serial> shell uiautomator dump
 adb -s <serial> pull /sdcard/window_dump.xml ui.xml
 ```
 
-`ui.xml` contiene todos los elementos clickeables, con sus coordenadas (`bounds="[x1,y1][x2,y2]"`), `text`, `resource-id`, `content-desc`, `class`. Útil para:
+`ui.xml` contains all clickable elements, with their coordinates (`bounds="[x1,y1][x2,y2]"`), `text`, `resource-id`, `content-desc`, `class`. Useful for:
 
-- Localizar un botón por texto: `grep 'text="Cancelar venta"' ui.xml`.
-- Calcular centro del botón: con `bounds="[120,300][420,400]"`, centro = `(270, 350)`.
+- Locating a button by text: `grep 'text="Cancelar venta"' ui.xml`.
+- Calculating the button's center: with `bounds="[120,300][420,400]"`, center = `(270, 350)`.
 
-Scripts útiles en bash:
+Useful bash scripts:
 ```bash
-# Listar todos los textos visibles
+# List all visible texts
 grep -oP 'text="\K[^"]+' ui.xml | sort -u
 
-# Coordenadas del botón "Cancelar venta"
+# Coordinates of the "Cancelar venta" button
 python3 -c "
 import re
 with open('ui.xml') as f: data = f.read()
@@ -31,36 +31,36 @@ if m:
 "
 ```
 
-**Limitación:** uiautomator dump no captura elementos nativos de React Native si están dibujados como vista única (RN usa una sola `ReactRootView` que envuelve todo). En esos casos el texto del botón no aparece en el dump y necesitas screenshot + análisis visual.
+**Limitation:** uiautomator dump does not capture React Native native elements if they are drawn as a single view (RN uses a single `ReactRootView` that wraps everything). In those cases the button text does not appear in the dump and you need a screenshot + visual analysis.
 
 ## Screenshots
 
-Forma portable:
+Portable form:
 ```bash
 adb -s <serial> exec-out screencap -p > shot-$(date +%s).png
 ```
 
-`exec-out` es preferible al pipe con `> archivo-local` desde el device — evita el doble paso `screencap /sdcard/x.png && adb pull`.
+`exec-out` is preferable to piping to a local file from the device — it avoids the double step `screencap /sdcard/x.png && adb pull`.
 
-Para captura a tamaño completo sin escalar:
+For full-size capture without scaling:
 ```bash
 adb -s <serial> shell wm size
 adb -s <serial> exec-out screencap -p > full.png
 ```
 
-**Truco útil para automatización:** convierte la screenshot a base64 y la pegas en el transcript para revisión visual:
+**Useful automation trick:** convert the screenshot to base64 and paste it in the transcript for visual review:
 ```bash
 adb exec-out screencap -p | base64 | head -c 200
 ```
 
 ## Filesystem / app data
 
-En **debug builds** puedes entrar con `run-as`:
+In **debug builds** you can enter with `run-as`:
 ```bash
 adb -s <serial> shell run-as com.egsolutions.zumapos ls -la /data/data/com.egsolutions.zumapos/
 ```
 
-Verás:
+You will see:
 ```
 cache/
 databases/
@@ -69,29 +69,29 @@ lib/
 shared_prefs/
 ```
 
-En **release builds**, `run-as` se rechaza con `run-as: Package 'com.egsolutions.zumapos' is not debuggable`. Para forzar acceso en release, necesitas root (`adb root` solo funciona en userdebug/eng builds; en producción real no es opción).
+In **release builds**, `run-as` is rejected with `run-as: Package 'com.egsolutions.zumapos' is not debuggable`. To force access in release, you need root (`adb root` only works on userdebug/eng builds; in real production it is not an option).
 
-### Pull de archivos específicos
+### Pull specific files
 
 ```bash
 # Logs
 adb -s <serial> shell run-as com.egsolutions.zumapos cat files/log.txt > log.txt
 
-# DB (ver sección SQLite)
+# DB (see SQLite section)
 adb -s <serial> shell run-as com.egsolutions.zumapos cat databases/datasqlite.db > datasqlite.db
 ```
 
-### Push (no es frecuente, pero útil para fixtures de testing)
+### Push (not common, but useful for testing fixtures)
 
 ```bash
 adb -s <serial> push ./fixture-product.csv /sdcard/Download/
 ```
 
-## SQLite (DB local de Zuma)
+## SQLite (Zuma's local DB)
 
-Zuma usa `expo-sqlite` (ver `app.json:54`) que materializa una DB SQLite local en `/data/data/com.egsolutions.zumapos/databases/`. El nombre exacto depende de cómo se inicializó, los más comunes: `datasqlite.db`, `zuma.db`, `data.db`.
+Zuma uses `expo-sqlite` (see `app.json:54`) which materializes a local SQLite DB at `/data/data/com.egsolutions.zumapos/databases/`. The exact name depends on how it was initialized, the most common: `datasqlite.db`, `zuma.db`, `data.db`.
 
-### Extraer la DB
+### Extract the DB
 
 ```bash
 adb -s <serial> shell run-as com.egsolutions.zumapos \
@@ -99,9 +99,9 @@ adb -s <serial> shell run-as com.egsolutions.zumapos \
 adb -s <serial> pull /sdcard/datasqlite.db .
 ```
 
-`run-as cp` evita problemas de "text file busy" si la DB está abierta por la app. Usar `cat` directo puede dar una copia consistente o truncada según el momento.
+`run-as cp` avoids "text file busy" problems if the DB is open by the app. Using `cat` directly can give a consistent or truncated copy depending on the moment.
 
-### Inspeccionar
+### Inspect
 
 ```bash
 sqlite3 datasqlite.db ".tables"
@@ -117,20 +117,20 @@ sqlite3 datasqlite.db ".schema sales"
 sqlite3 datasqlite.db "SELECT id, total, status, createdAt FROM sales ORDER BY createdAt DESC LIMIT 5;"
 ```
 
-Para no instalar `sqlite3` localmente, puedes inspeccionar vía adb directo:
+To avoid installing `sqlite3` locally, you can inspect via adb directly:
 ```bash
 adb shell run-as com.egsolutions.zumapos sqlite3 databases/datasqlite.db "SELECT * FROM sales LIMIT 5;"
 ```
 
-Esto requiere que el `sqlite3` binary exista en el device (viene por defecto en AOSP; user-builds no siempre).
+This requires the `sqlite3` binary to exist on the device (it comes by default in AOSP; user-builds not always).
 
-## Activity al frente
+## Activity on top
 
 ```bash
 adb -s <serial> shell dumpsys activity top
 ```
 
-Output extenso con `ACTIVITY com.egsolutions.zumapos/.MainActivity`. Útil para confirmar que la app está al frente después de un `am start`, o para diagnosticar "se fue al background y no sé por qué".
+Extensive output with `ACTIVITY com.egsolutions.zumapos/.MainActivity`. Useful to confirm the app is on top after an `am start`, or to diagnose "it went to the background and I don't know why".
 
 ## Backstack
 
@@ -138,13 +138,13 @@ Output extenso con `ACTIVITY com.egsolutions.zumapos/.MainActivity`. Útil para 
 adb -s <serial> shell dumpsys activity activities
 ```
 
-Lista todas las activities en el back stack con sus estados. Útil para reproducir bugs de "se duplicó la pantalla X".
+Lists all activities in the back stack with their states. Useful to reproduce "screen X was duplicated" bugs.
 
-## Información del proceso
+## Process information
 
 ```bash
 adb -s <serial> shell ps -A | grep zumapos
 adb -s <serial> shell cat /proc/$(adb shell pidof com.egsolutions.zumapos)/status | head -20
 ```
 
-PID actual: `adb shell pidof com.egsolutions.zumapos`. Útil para filtros en `logcat --pid`.
+Current PID: `adb shell pidof com.egsolutions.zumapos`. Useful for filters in `logcat --pid`.

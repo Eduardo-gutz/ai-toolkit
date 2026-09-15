@@ -281,7 +281,7 @@ export const cleanupDirs = makeCleanupDirs({ rootDir: OPENCODE_ROOT });
 // Single source of truth: <source>/prompts/bootstrap/ in the toolkit repo.
 // installBootstrap() renders an OpenCode command at .opencode/commands/
 // with frontmatter (command spec compliant) + the conductor body (paths
-// adjusted to @0X-... references) + 8 supporting files (byte-by-byte copies).
+// adjusted to @0X-... references) + 9 supporting files (byte-by-byte copies).
 //
 // Source files are NEVER modified by this adapter. The conductor lives in
 // toolkit source as `source/prompts/bootstrap/00-conductor.md`.
@@ -291,7 +291,7 @@ const OPENCODE_BOOTSTRAP_SUBDIR = '.opencode/commands/bootstrap';
 const OPENCODE_BOOTSTRAP_FRONTMATTER = `---
 description: >
   Initializes the project context guide (AGENTS.md + .context/).
-  Runs 8 sequential steps with isolated sub-agents.
+  Runs 9 sequential steps with isolated sub-agents.
 subtask: false
 ---
 `;

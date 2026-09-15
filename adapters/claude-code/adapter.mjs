@@ -300,7 +300,7 @@ export const cleanupDirs = makeCleanupDirs({ rootDir: CLAUDE_ROOT });
 // Single source of truth: <source>/prompts/bootstrap/ in the toolkit repo.
 // installBootstrap() renders a Claude Code skill at .claude/skills/bootstrap/
 // with frontmatter (skill spec compliant) + the conductor body (paths adjusted
-// to ./0X-... relative refs) + 8 supporting files (byte-by-byte copies).
+// to ./0X-... relative refs) + 9 supporting files (byte-by-byte copies).
 //
 // Source files are NEVER modified by this adapter. The conductor lives in
 // toolkit source as `source/prompts/bootstrap/00-conductor.md`.
@@ -311,7 +311,7 @@ const CLAUDE_BOOTSTRAP_FRONTMATTER = `---
 name: bootstrap
 description: >
   Initializes the project context guide (AGENTS.md + .context/).
-  Runs 8 sequential steps with isolated sub-agents. Trigger:
+  Runs 9 sequential steps with isolated sub-agents. Trigger:
   "/bootstrap" or when the developer asks to initialize the context.
 disable-model-invocation: true
 context: fork

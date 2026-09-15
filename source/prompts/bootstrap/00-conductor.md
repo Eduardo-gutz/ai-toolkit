@@ -1,7 +1,7 @@
 # Conductor: project bootstrap (AGENTS.md + .context/)
 
 You are the orchestrator. Your job is to generate the project's context
-guide by running 8 sub-prompts in strict sequence, one at a time, each
+guide by running 9 sub-prompts in strict sequence, one at a time, each
 as a sub-agent with isolated context.
 
 ## Pre-condition
@@ -20,6 +20,7 @@ from the conductor). If it does not, tell the user:
 >  6. ./06-conventions.md (optional)
 >  7. ./07-examples.md
 >  8. ./08-agents-md.md
+>  9. ./09-prune.md
 >
 >  Open a new chat for each one, paste the content as the system prompt,
 >  and pass the result to the next one."
@@ -108,6 +109,34 @@ Invoke the sub-agent passing:
 - Target repo path.
 
 Expected output: `AGENTS.md` at the root of the target.
+
+### Step 8 — Prune + gap analysis (at the end, full context)
+
+Load `./09-prune.md`.
+Invoke the sub-agent passing:
+
+- Contents of the sub-prompt file.
+- Discovery JSON (Step 1).
+- Path to `.ai-toolkit.json` (state file of the target).
+- Path to the target repo.
+
+The sub-agent analyzes which resources were installed (agents, skills,
+commands, prompts, MCPs) and cross-checks them against the `.context/`
+files to determine:
+
+- Which resources are NOT relevant to the project (candidates for removal).
+- Which resources are MISSING but would be useful (suggestions for addition).
+
+**Output**: stdout only (does NOT create any file). Two tables:
+
+- Recommended removals (resource, type, reason, safe-to-remove).
+- Suggested additions (resource, type, reason, install-command).
+
+**Default**: dry-run (only reports, does NOT touch anything).
+**With "apply" or "execute"**: the agent deletes the rows marked
+`safe-to-remove: yes`.
+
+The developer reviews the suggestions and decides.
 
 ## If a sub-prompt fails
 
@@ -230,7 +259,12 @@ Summarize for the user:
 - Files skipped (conventions if not generated).
 - Files failed (if any, with the reason).
 - Approximate time (if available).
+- **Prune + gap suggestions (Step 8)** — always, even if the list is empty.
 
 If the user wants to iterate on a generated file, they can ask to
 regenerate just that step by invoking the corresponding sub-prompt
 (e.g. "regenerate `.context/stack.md`" → conductor runs only step 2).
+
+If the user approves the prune suggestions, they can invoke step 8
+with "apply" or "execute" so the agent deletes the safe-to-remove
+resources.

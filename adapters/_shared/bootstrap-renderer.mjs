@@ -15,7 +15,7 @@ import { join } from 'node:path';
 export const BOOTSTRAP_CONDUCTOR_FILE = '00-conductor.md';
 
 // Canonical order, alphabetical by name. Matches the source's numerical
-// ordering (01..08). Any new supporting file added to the source must appear
+// ordering (01..09). Any new supporting file added to the source must appear
 // here in its corresponding position.
 export const BOOTSTRAP_SUPPORTING_FILES = Object.freeze([
   '01-pre-flight.md',
@@ -26,16 +26,17 @@ export const BOOTSTRAP_SUPPORTING_FILES = Object.freeze([
   '06-conventions.md',
   '07-examples.md',
   '08-agents-md.md',
+  '09-prune.md',
 ]);
 
 /**
- * Reads the 9 files from the canonical bootstrap source.
+ * Reads the 10 files from the canonical bootstrap source.
  *
  * @param {string} source - absolute path to the toolkit's source/ directory
  *                          (e.g. `<toolkitRoot>/source`)
  * @returns {{ conductor: string, supportingFiles: string[] }}
  *   conductor: contents of `00-conductor.md`
- *   supportingFiles: array of the 8 supporting files in canonical order
+ *   supportingFiles: array of the 9 supporting files in canonical order
  * @throws if any file is missing
  */
 export function readBootstrapSource(source) {
@@ -50,7 +51,7 @@ export function readBootstrapSource(source) {
 /**
  * Rewrites the conductor's `./0X-<name>.md` sub-prompt paths according to
  * the tool's mapping. The conductor references these paths when listing the
- * 8 sub-prompts; each adapter rewrites them to its native format (e.g.
+ * 9 sub-prompts; each adapter rewrites them to its native format (e.g.
  * `./0X-...` for Claude Code, `@0X-...` for OpenCode).
  *
  * The mapping shape is `{ '01-pre-flight.md': './01-pre-flight.md', ... }`.

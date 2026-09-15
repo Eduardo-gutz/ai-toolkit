@@ -2,7 +2,7 @@
 // reads the canonical bootstrap source and rewrites conductor paths.
 //
 // Behavior under test:
-//   - readBootstrapSource(sourceDir) returns the conductor body + 8 supporting
+//   - readBootstrapSource(sourceDir) returns the conductor body + 9 supporting
 //     files in canonical alphabetical order, matching the names exported by
 //     BOOTSTRAP_SUPPORTING_FILES.
 //   - adaptConductorPaths(conductor, {}) is a no-op (empty mapping leaves the
@@ -27,7 +27,7 @@ import {
 const TOOLKIT_ROOT = '/Users/eduardogutierrez/Desktop/VortexSound_back/ai-toolkit';
 const TOOLKIT_SOURCE = join(TOOLKIT_ROOT, 'source');
 
-test('readBootstrapSource: returns conductor + 8 supporting files with exact canonical names', () => {
+test('readBootstrapSource: returns conductor + 9 supporting files with exact canonical names', () => {
   const result = readBootstrapSource(TOOLKIT_SOURCE);
 
   assert.equal(typeof result.conductor, 'string', 'conductor must be a string');
@@ -35,12 +35,12 @@ test('readBootstrapSource: returns conductor + 8 supporting files with exact can
   assert.equal(typeof result, 'object', 'result must be an object');
   assert.ok(Array.isArray(result.supportingFiles), 'supportingFiles must be an array');
 
-  // Exactly 8 supporting files, in canonical order.
-  assert.equal(result.supportingFiles.length, 8, 'supportingFiles must have 8 entries');
+  // Exactly 9 supporting files, in canonical order.
+  assert.equal(result.supportingFiles.length, 9, 'supportingFiles must have 9 entries');
   assert.equal(result.supportingFiles.length, BOOTSTRAP_SUPPORTING_FILES.length,
     'supportingFiles length must match BOOTSTRAP_SUPPORTING_FILES length');
 
-  // Verify the 8 canonical filenames appear in BOOTSTRAP_SUPPORTING_FILES
+  // Verify the 9 canonical filenames appear in BOOTSTRAP_SUPPORTING_FILES
   // and that readBootstrapSource reads each one (each entry is non-empty
   // content matching the on-disk source).
   const expectedNames = [
@@ -52,9 +52,10 @@ test('readBootstrapSource: returns conductor + 8 supporting files with exact can
     '06-conventions.md',
     '07-examples.md',
     '08-agents-md.md',
+    '09-prune.md',
   ];
   assert.deepEqual([...BOOTSTRAP_SUPPORTING_FILES], expectedNames,
-    'BOOTSTRAP_SUPPORTING_FILES must list the 8 canonical filenames in order');
+    'BOOTSTRAP_SUPPORTING_FILES must list the 9 canonical filenames in order');
 
   // Each supporting file is a non-empty string (the helper reads from disk;
   // if the helper returned a different shape the assertion would fail).

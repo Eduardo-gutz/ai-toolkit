@@ -3,7 +3,7 @@
 // installBootstrap({source, target}) renders the /bootstrap command from
 // the canonical source at <source>/prompts/bootstrap/. It produces:
 //   - <target>/.opencode/commands/bootstrap.md                          (with frontmatter + conductor body, paths adjusted to @0X-...)
-//   - <target>/.opencode/commands/bootstrap/01..08.md                   (8 supporting files, byte-by-byte copies)
+//   - <target>/.opencode/commands/bootstrap/01..09.md                   (9 supporting files, byte-by-byte copies)
 //
 // Idempotency: if the bootstrap command directory already exists, the function
 // detects it and aborts (no overwrite, no crash) — re-running is a safe no-op.
@@ -29,6 +29,7 @@ const SUPPORTING_FILES = [
   '06-conventions.md',
   '07-examples.md',
   '08-agents-md.md',
+  '09-prune.md',
 ];
 
 async function mkTmp() {
@@ -93,7 +94,7 @@ test('opencode: installBootstrap rewrites conductor paths to @0X-...', async () 
     'command body must not contain raw "source/prompts/bootstrap/" paths'
   );
 
-  // Body must contain rewritten paths of the form @0X-<name>.md for all 8 supporting files.
+  // Body must contain rewritten paths of the form @0X-<name>.md for all 9 supporting files.
   for (const name of SUPPORTING_FILES) {
     assert.ok(
       content.includes(`@${name}`),
@@ -102,7 +103,7 @@ test('opencode: installBootstrap rewrites conductor paths to @0X-...', async () 
   }
 });
 
-test('opencode: installBootstrap copies all 8 supporting files byte-by-byte to .opencode/commands/bootstrap/', async () => {
+test('opencode: installBootstrap copies all 9 supporting files byte-by-byte to .opencode/commands/bootstrap/', async () => {
   const tmpDir = await mkTmp();
   const adapter = await import(ADAPTER_PATH);
 

@@ -17,6 +17,12 @@ export const ALL_TYPES = Object.freeze(['agents', 'skills', 'mcps', 'rules', 'co
  *          'commands' is accepted for forward-compat but is a no-op
  *          (walker deferred per WHY.md §8 Fase 3).
  *
+ * `installBootstrap` runs unconditionally per tool (it's a meta-install
+ * providing a /bootstrap command to the agent, not a content type). The
+ * `--types` filter only applies to the 5 content types listed above; it
+ * does NOT gate the bootstrap install — a user passing
+ * `--tools=claude-code --types=agents` will still get the bootstrap skill.
+ *
  * Auto-creates projectDir if missing. Does NOT touch state directly —
  * adapters handle their own per-resource state writes.
  *
@@ -93,6 +99,29 @@ export async function initCommand({ flags, config, configPath, projectDir, toolk
     } catch (err) {
       console.error(`  ✗ ${tool}: ${err.message}`);
       errors.push({ tool, message: err.message });
+    }
+
+    // Install bootstrap skill/command (per-tool adapter-specific rendering).
+    // Backward-compatible: if the adapter doesn't expose installBootstrap, skip.
+    if (typeof adapter.installBootstrap === 'function') {
+      try {
+        const result = await adapter.installBootstrap({
+          source: resolve(toolkitRoot, config.source || './source'),
+          target: projectDir,
+        });
+        // Defense in depth: init always logs the outcome, even if the
+        // adapter already logged its own skip message — that way a future
+        // adapter that forgets to log won't leave the user in silence.
+        if (result?.installed) {
+          console.log(`  ✓ ${tool} bootstrap installed.`);
+        } else {
+          console.log(`  → ${tool} bootstrap skipped (already installed).`);
+        }
+      } catch (err) {
+        // Bootstrap is a value-add, not a core install — log and continue.
+        // Adapters that don't support bootstrap don't reach this branch.
+        console.warn(`  ! ${tool} bootstrap: ${err.message}`);
+      }
     }
   }
 

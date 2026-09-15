@@ -11,6 +11,11 @@ import { removeIfEmpty, removeJsonKeys, readJsonConfig } from '../_shared/cleanu
 import { assertSafeName } from '../_shared/safe-name.mjs';
 import { makeResourcePaths, makeCleanupDirs } from '../_shared/tool-paths.mjs';
 import {
+  readBootstrapSource,
+  adaptConductorPaths,
+  BOOTSTRAP_SUPPORTING_FILES,
+} from '../_shared/bootstrap-renderer.mjs';
+import {
   readState,
   writeState,
   recordInstalled,
@@ -270,6 +275,82 @@ export const resourcePaths = makeResourcePaths({
 
 // Thin wrapper over makeCleanupDirs — see adapters/_shared/tool-paths.mjs.
 export const cleanupDirs = makeCleanupDirs({ rootDir: OPENCODE_ROOT });
+
+// ─── Bootstrap command (OpenCode) ─────────────────────────────────────────
+//
+// Single source of truth: <source>/prompts/bootstrap/ in the toolkit repo.
+// installBootstrap() renders an OpenCode command at .opencode/commands/
+// with frontmatter (command spec compliant) + the conductor body (paths
+// adjusted to @0X-... references) + 8 supporting files (byte-by-byte copies).
+//
+// Source files are NEVER modified by this adapter. The conductor lives in
+// toolkit source as `source/prompts/bootstrap/00-conductor.md`.
+
+const OPENCODE_BOOTSTRAP_FILE = '.opencode/commands/bootstrap.md';
+const OPENCODE_BOOTSTRAP_SUBDIR = '.opencode/commands/bootstrap';
+const OPENCODE_BOOTSTRAP_FRONTMATTER = `---
+description: >
+  Initializes the project context guide (AGENTS.md + .context/).
+  Runs 8 sequential steps with isolated sub-agents.
+subtask: false
+---
+`;
+
+/**
+ * Installs the OpenCode /bootstrap command from <source>/prompts/bootstrap/.
+ *
+ * OpenCode uses the `@filename` syntax to reference files relative to the
+ * command's location (unlike Claude Code, which uses `./filename`).
+ *
+ * Idempotency: if `<target>/.opencode/commands/bootstrap.md` or
+ * `<target>/.opencode/commands/bootstrap/` already exists, it does NOT
+ * overwrite — it aborts silently and logs a skip message. To force a
+ * reinstall, delete the file/directory manually or run `sync` afterwards.
+ *
+ * @param {{source: string, target: string}} args
+ *   source: absolute path to the toolkit's source/ directory
+ *   target: absolute path to the target project directory
+ * @returns {Promise<{installed: boolean}>} installed=false when it already existed
+ */
+export async function installBootstrap({ source, target }) {
+  const bootstrapFile = join(target, OPENCODE_BOOTSTRAP_FILE);
+  const bootstrapSubdir = join(target, OPENCODE_BOOTSTRAP_SUBDIR);
+
+  // OpenCode: check the supporting files subdir (the canonical "parent dir"
+  // for the artifacts, mirroring the Claude adapter's check on
+  // `.claude/skills/bootstrap/`). An orphaned `bootstrap.md` without its
+  // subdir would not be detected here, but such a state is broken anyway
+  // (the command references files that don't exist) and reinstalling
+  // recovers it.
+  if (existsSync(bootstrapSubdir)) {
+    console.log(
+      `  → Bootstrap command already exists at ${OPENCODE_BOOTSTRAP_FILE}. ` +
+      `Skipping (delete the file/dir to reinstall).`
+    );
+    return { installed: false };
+  }
+
+  const { conductor, supportingFiles } = readBootstrapSource(source);
+
+  // OpenCode: conductor paths are rewritten to `@0X-...` (OpenCode's native
+  // reference syntax for sibling files of the command).
+  const pathMapping = Object.fromEntries(
+    BOOTSTRAP_SUPPORTING_FILES.map((name) => [name, `@${name}`])
+  );
+  const adjustedConductor = adaptConductorPaths(conductor, pathMapping);
+
+  await mkdir(bootstrapSubdir, { recursive: true });
+  await writeFile(bootstrapFile, OPENCODE_BOOTSTRAP_FRONTMATTER + adjustedConductor);
+
+  for (let i = 0; i < BOOTSTRAP_SUPPORTING_FILES.length; i++) {
+    await writeFile(
+      join(target, OPENCODE_BOOTSTRAP_SUBDIR, BOOTSTRAP_SUPPORTING_FILES[i]),
+      supportingFiles[i]
+    );
+  }
+
+  return { installed: true };
+}
 
 async function installAgents(source, target, state) {
   const agents = listAgents(source);

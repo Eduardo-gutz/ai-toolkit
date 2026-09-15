@@ -11,6 +11,11 @@ import { removeIfEmpty, removeJsonKeys, readJsonConfig } from '../_shared/cleanu
 import { assertSafeName } from '../_shared/safe-name.mjs';
 import { makeResourcePaths, makeCleanupDirs } from '../_shared/tool-paths.mjs';
 import {
+  readBootstrapSource,
+  adaptConductorPaths,
+  BOOTSTRAP_SUPPORTING_FILES,
+} from '../_shared/bootstrap-renderer.mjs';
+import {
   readState,
   writeState,
   recordInstalled,
@@ -289,6 +294,78 @@ export const resourcePaths = makeResourcePaths({
 
 // Thin wrapper over makeCleanupDirs — see adapters/_shared/tool-paths.mjs.
 export const cleanupDirs = makeCleanupDirs({ rootDir: CLAUDE_ROOT });
+
+// ─── Bootstrap skill (Claude Code) ────────────────────────────────────────
+//
+// Single source of truth: <source>/prompts/bootstrap/ in the toolkit repo.
+// installBootstrap() renders a Claude Code skill at .claude/skills/bootstrap/
+// with frontmatter (skill spec compliant) + the conductor body (paths adjusted
+// to ./0X-... relative refs) + 8 supporting files (byte-by-byte copies).
+//
+// Source files are NEVER modified by this adapter. The conductor lives in
+// toolkit source as `source/prompts/bootstrap/00-conductor.md`.
+
+const CLAUDE_BOOTSTRAP_DIR = '.claude/skills/bootstrap';
+const CLAUDE_BOOTSTRAP_SKILL = 'SKILL.md';
+const CLAUDE_BOOTSTRAP_FRONTMATTER = `---
+name: bootstrap
+description: >
+  Initializes the project context guide (AGENTS.md + .context/).
+  Runs 8 sequential steps with isolated sub-agents. Trigger:
+  "/bootstrap" or when the developer asks to initialize the context.
+disable-model-invocation: true
+context: fork
+---
+`;
+
+/**
+ * Installs the Claude Code /bootstrap skill from <source>/prompts/bootstrap/.
+ *
+ * Idempotency: if `<target>/.claude/skills/bootstrap/` already exists, it
+ * does NOT overwrite — it aborts silently and logs a skip message. To force
+ * a reinstall, delete the directory manually or run `sync` afterwards.
+ *
+ * @param {{source: string, target: string}} args
+ *   source: absolute path to the toolkit's source/ directory
+ *           (e.g. `<toolkitRoot>/source`)
+ *   target: absolute path to the target project directory
+ * @returns {Promise<{installed: boolean}>} installed=false when it already existed
+ */
+export async function installBootstrap({ source, target }) {
+  const bootstrapDir = join(target, CLAUDE_BOOTSTRAP_DIR);
+
+  if (existsSync(bootstrapDir)) {
+    console.log(
+      `  → Bootstrap skill already exists at ${CLAUDE_BOOTSTRAP_DIR}/. ` +
+      `Skipping (delete the directory to reinstall).`
+    );
+    return { installed: false };
+  }
+
+  const { conductor, supportingFiles } = readBootstrapSource(source);
+
+  // Claude Code: conductor paths are rewritten to `./0X-...` (relative to
+  // the skill directory).
+  const pathMapping = Object.fromEntries(
+    BOOTSTRAP_SUPPORTING_FILES.map((name) => [name, `./${name}`])
+  );
+  const adjustedConductor = adaptConductorPaths(conductor, pathMapping);
+
+  await mkdir(bootstrapDir, { recursive: true });
+  await writeFile(
+    join(bootstrapDir, CLAUDE_BOOTSTRAP_SKILL),
+    CLAUDE_BOOTSTRAP_FRONTMATTER + adjustedConductor
+  );
+
+  for (let i = 0; i < BOOTSTRAP_SUPPORTING_FILES.length; i++) {
+    await writeFile(
+      join(bootstrapDir, BOOTSTRAP_SUPPORTING_FILES[i]),
+      supportingFiles[i]
+    );
+  }
+
+  return { installed: true };
+}
 
 async function installAgents(source, target, state) {
   const agents = listAgents(source);

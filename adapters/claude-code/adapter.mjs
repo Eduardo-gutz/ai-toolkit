@@ -25,6 +25,7 @@ import {
   releaseRulesOwnership,
   pruneEmpty,
 } from '../_shared/state.mjs';
+import { createLifecycle } from '../_shared/lifecycle-registry.mjs';
 
 /**
  * Claude Code adapter.
@@ -75,6 +76,15 @@ export async function install({ source, target, config, types }) {
   if (want('mcps'))   await installMcps(source, target, state, config);
   if (want('rules'))  await installRules(source, target, state);
 
+  // Run lifecycle extras (e.g., bootstrap, future lint rules).
+  for (const hook of lifecycle.install) {
+    try {
+      await hook({ source, target });
+    } catch (err) {
+      console.warn(`[claude-code] lifecycle hook failed: ${err.message}. Continuing.`);
+    }
+  }
+
   writeState(target, state);
   return state;
 }
@@ -91,7 +101,36 @@ export async function install({ source, target, config, types }) {
  */
 export async function sync({ source, target, config, types }) {
   const state = await install({ source, target, config, types });
+  // Bootstrap may have been skipped by install() (idempotent default).
+  // Force re-install so source modifications to source/prompts/bootstrap/
+  // propagate to the target. This is the sync propagation fix: previously
+  // sync no-op'd against existing bootstrap dirs, so changes never
+  // reached the target. Other 4 content types (agents/skills/mcps/rules)
+  // already overwrite on sync; bootstrap now joins them.
+  // IMPORTANT: this MUST run BEFORE the lifecycle.sync loop below so the
+  // wipe + recreate completes before any other sync-only hook fires.
+  if (typeof installBootstrap === 'function') {
+    try {
+      await installBootstrap({ source, target }, { force: true });
+    } catch (err) {
+      console.warn(`[claude-code] bootstrap reinstall failed: ${err.message}. Continuing.`);
+    }
+  }
   recordSync(state, 'claude-code');
+  // Iterate lifecycle.sync extras — registry-wide contract: every public
+  // lifecycle method (install/sync/remove) walks its corresponding array.
+  // lifecycle.sync is reserved for extras that fire only on sync, not on a
+  // fresh install. installBootstrap is NOT pushed here: the direct call
+  // above (with force=true) handles the wipe + recreate. Pushing it here
+  // too would trigger a third invocation with force=false, producing a
+  // spurious "already exists" log in the idempotent path.
+  for (const hook of lifecycle.sync) {
+    try {
+      await hook({ source, target });
+    } catch (err) {
+      console.warn(`[claude-code] lifecycle hook failed: ${err.message}. Continuing.`);
+    }
+  }
   writeState(target, state);
 }
 
@@ -194,6 +233,24 @@ export async function remove({ target, source, config, types }) {
   pruneEmpty(state);
 
   writeState(target, state);
+
+  // Run lifecycle extras (e.g., bootstrap uninstall, future lint rules)
+  // BEFORE postRemoveCleanup. If the bootstrap subdir was the only
+  // occupant of `.claude/skills/`, the previous order (postRemoveCleanup
+  // first, then uninstallBootstrap) left `.claude/skills/` and `.claude/`
+  // as orphan empty dirs after the bootstrap dir was finally removed —
+  // postRemoveCleanup saw the non-empty skills dir and skipped. Iterating
+  // lifecycle.remove first guarantees postRemoveCleanup finds the parent
+  // dirs empty and removes them. (This is the M1 fix; the lifecycle
+  // registry preserves the order but generalizes the mechanism so future
+  // extras get the same treatment.)
+  for (const hook of lifecycle.remove) {
+    try {
+      await hook({ target });
+    } catch (err) {
+      console.warn(`[claude-code] lifecycle hook failed: ${err.message}. Continuing.`);
+    }
+  }
 
   await postRemoveCleanup(target, state, 'claude-code', {
     hadRules,
@@ -319,27 +376,32 @@ context: fork
 `;
 
 /**
- * Installs the Claude Code /bootstrap skill from <source>/prompts/bootstrap/.
+ * Install or re-install the bootstrap skill in the target project.
  *
- * Idempotency: if `<target>/.claude/skills/bootstrap/` already exists, it
- * does NOT overwrite — it aborts silently and logs a skip message. To force
- * a reinstall, delete the directory manually or run `sync` afterwards.
+ * By default (force=false): idempotent — skip if the bootstrap dir
+ * already exists. Safe for `init` (don't clobber existing).
+ *
+ * With force=true: wipe and recreate the bootstrap dir unconditionally.
+ * Required for `sync` so source modifications propagate.
  *
  * @param {{source: string, target: string}} args
- *   source: absolute path to the toolkit's source/ directory
- *           (e.g. `<toolkitRoot>/source`)
- *   target: absolute path to the target project directory
- * @returns {Promise<{installed: boolean}>} installed=false when it already existed
+ * @param {{force?: boolean}} [options]
+ * @returns {Promise<{installed: boolean}>}
  */
-export async function installBootstrap({ source, target }) {
+export async function installBootstrap({ source, target }, options = {}) {
+  const { force = false } = options;
   const bootstrapDir = join(target, CLAUDE_BOOTSTRAP_DIR);
 
   if (existsSync(bootstrapDir)) {
-    console.log(
-      `  → Bootstrap skill already exists at ${CLAUDE_BOOTSTRAP_DIR}/. ` +
-      `Skipping (delete the directory to reinstall).`
-    );
-    return { installed: false };
+    if (!force) {
+      console.log(
+        `  → Bootstrap skill already exists at ${CLAUDE_BOOTSTRAP_DIR}/. ` +
+        `Skipping (delete the directory to reinstall).`
+      );
+      return { installed: false };
+    }
+    // force=true: wipe existing so source changes propagate.
+    await rm(bootstrapDir, { recursive: true, force: true });
   }
 
   const { conductor, supportingFiles } = readBootstrapSource(source);
@@ -366,6 +428,53 @@ export async function installBootstrap({ source, target }) {
 
   return { installed: true };
 }
+
+/**
+ * Remove the bootstrap skill from the target project.
+ * Idempotent: skip if the bootstrap dir doesn't exist.
+ *
+ * Removes the entire `.claude/skills/bootstrap/` directory.
+ *
+ * @param {{target: string}} args
+ * @returns {Promise<{removed: boolean}>} true if removed, false if already absent
+ */
+export async function uninstallBootstrap({ target }) {
+  const bootstrapDir = join(target, CLAUDE_BOOTSTRAP_DIR);
+
+  if (!existsSync(bootstrapDir)) {
+    return { removed: false };
+  }
+
+  await rm(bootstrapDir, { recursive: true, force: true });
+  return { removed: true };
+}
+
+// ─── Lifecycle registry ───────────────────────────────────────────────────
+//
+// Lifecycle hooks: adding a new extra (lint rules, security hooks,
+// templates) = push to the right arrays. install/sync/remove iterate them
+// generically with try/catch + console.warn so a misbehaving extra doesn't
+// break the whole lifecycle. This makes the adapter "open to extensions":
+// a new extra is one push, not 12 points of maintenance across the two
+// adapters.
+//
+// install() runs lifecycle.install hooks AFTER installing agents/skills/
+// mcps/rules and BEFORE writeState. sync() reuses install() so it
+// automatically picks up install-time extras; lifecycle.sync is reserved
+// for extras that should fire only on sync, not on a fresh install. Note:
+// installBootstrap is intentionally NOT pushed to lifecycle.sync — the
+// direct call in sync() (with force=true) handles the wipe + recreate.
+// Future sync-only extras (e.g., lint rules) should push to lifecycle.sync.
+// remove() runs lifecycle.remove BEFORE postRemoveCleanup to preserve the
+// M1 ordering invariant (extras that may leave empty parents must run
+// before the cleanup pass that sweeps them up).
+const lifecycle = createLifecycle();
+lifecycle.install.push(installBootstrap);
+// lifecycle.sync is intentionally empty — reserved for future sync-only
+// extras (e.g., lint rules). Do NOT push installBootstrap here.
+lifecycle.remove.push(uninstallBootstrap);
+
+export { lifecycle };
 
 async function installAgents(source, target, state) {
   const agents = listAgents(source);

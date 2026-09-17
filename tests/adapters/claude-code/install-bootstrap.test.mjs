@@ -159,3 +159,52 @@ test('claude-code: installBootstrap is idempotent (second call detects existing,
   const secondMtime = (await lstat(skillMdPath)).mtimeMs;
   assert.equal(secondMtime, firstMtime, 'SKILL.md mtime unchanged (not rewritten)');
 });
+
+// ─── uninstallBootstrap ─────────────────────────────────────────────────
+//
+// uninstallBootstrap({target}) removes .claude/skills/bootstrap/. It is the
+// counterpart to installBootstrap() and is invoked by adapter.remove() so
+// `ai-toolkit remove` cleans up the bootstrap skill (preventing orphaned
+// .claude/skills/bootstrap/ after tool removal).
+//
+// Idempotent: returns {removed: false} when the dir doesn't exist, so it's
+// safe to call even when installBootstrap was never run.
+
+import { mkdirSync, writeFileSync } from 'node:fs';
+
+test('claude-code: uninstallBootstrap is exported as a function', async () => {
+  const adapter = await import(ADAPTER_PATH);
+  assert.equal(typeof adapter.uninstallBootstrap, 'function', 'uninstallBootstrap must be exported');
+});
+
+test('claude-code: uninstallBootstrap removes .claude/skills/bootstrap/ when present', async () => {
+  // Setup: create the bootstrap dir with a dummy file manually (faster than
+  // a real installBootstrap round-trip; isolates uninstallBootstrap from
+  // installBootstrap so a regression in either surfaces independently).
+  const tmpDir = await mkTmp();
+  const bootstrapDir = join(tmpDir, '.claude/skills/bootstrap');
+  mkdirSync(bootstrapDir, { recursive: true });
+  writeFileSync(join(bootstrapDir, 'SKILL.md'), '# dummy');
+  writeFileSync(join(bootstrapDir, '01-pre-flight.md'), '# dummy');
+  assert.ok(await fileExists(bootstrapDir), 'pre: bootstrap dir exists');
+
+  const adapter = await import(ADAPTER_PATH);
+  const result = await adapter.uninstallBootstrap({ target: tmpDir });
+
+  assert.equal(result.removed, true, 'uninstallBootstrap returns {removed: true} when dir existed');
+  assert.equal(await fileExists(bootstrapDir), false, 'bootstrap dir removed');
+});
+
+test('claude-code: uninstallBootstrap is idempotent (skip when not present)', async () => {
+  // Setup: empty target — no bootstrap dir.
+  const tmpDir = await mkTmp();
+  const bootstrapDir = join(tmpDir, '.claude/skills/bootstrap');
+  assert.equal(await fileExists(bootstrapDir), false, 'pre: bootstrap dir does not exist');
+
+  const adapter = await import(ADAPTER_PATH);
+  const result = await adapter.uninstallBootstrap({ target: tmpDir });
+
+  assert.equal(result.removed, false, 'uninstallBootstrap returns {removed: false} when dir missing');
+  // No throw + no side effects on a missing dir.
+  assert.equal(await fileExists(bootstrapDir), false, 'bootstrap dir still absent');
+});

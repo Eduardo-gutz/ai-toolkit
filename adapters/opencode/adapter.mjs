@@ -25,6 +25,7 @@ import {
   releaseRulesOwnership,
   pruneEmpty,
 } from '../_shared/state.mjs';
+import { createLifecycle } from '../_shared/lifecycle-registry.mjs';
 
 /**
  * opencode adapter.
@@ -76,6 +77,15 @@ export async function install({ source, target, config, types }) {
   if (want('mcps'))   await installMcps(source, target, state, config);
   if (want('rules'))  await installRules(source, target, state);
 
+  // Run lifecycle extras (e.g., bootstrap, future lint rules).
+  for (const hook of lifecycle.install) {
+    try {
+      await hook({ source, target });
+    } catch (err) {
+      console.warn(`[opencode] lifecycle hook failed: ${err.message}. Continuing.`);
+    }
+  }
+
   writeState(target, state);
   return state;
 }
@@ -92,7 +102,36 @@ export async function install({ source, target, config, types }) {
  */
 export async function sync({ source, target, config, types }) {
   const state = await install({ source, target, config, types });
+  // Bootstrap may have been skipped by install() (idempotent default).
+  // Force re-install so source modifications to source/prompts/bootstrap/
+  // propagate to the target. This is the sync propagation fix: previously
+  // sync no-op'd against existing bootstrap dirs, so changes never
+  // reached the target. Other 4 content types (agents/skills/mcps/rules)
+  // already overwrite on sync; bootstrap now joins them.
+  // IMPORTANT: this MUST run BEFORE the lifecycle.sync loop below so the
+  // wipe + recreate completes before any other sync-only hook fires.
+  if (typeof installBootstrap === 'function') {
+    try {
+      await installBootstrap({ source, target }, { force: true });
+    } catch (err) {
+      console.warn(`[opencode] bootstrap reinstall failed: ${err.message}. Continuing.`);
+    }
+  }
   recordSync(state, 'opencode');
+  // Iterate lifecycle.sync extras — registry-wide contract: every public
+  // lifecycle method (install/sync/remove) walks its corresponding array.
+  // lifecycle.sync is reserved for extras that fire only on sync, not on a
+  // fresh install. installBootstrap is NOT pushed here: the direct call
+  // above (with force=true) handles the wipe + recreate. Pushing it here
+  // too would trigger a third invocation with force=false, producing a
+  // spurious "already exists" log in the idempotent path.
+  for (const hook of lifecycle.sync) {
+    try {
+      await hook({ source, target });
+    } catch (err) {
+      console.warn(`[opencode] lifecycle hook failed: ${err.message}. Continuing.`);
+    }
+  }
   writeState(target, state);
 }
 
@@ -190,6 +229,26 @@ export async function remove({ target, source, config, types }) {
 
   writeState(target, state);
 
+  // Run lifecycle extras (e.g., bootstrap uninstall, future lint rules)
+  // BEFORE postRemoveCleanup. If the bootstrap artifacts were the only
+  // occupants of `.opencode/commands/` (file) and
+  // `.opencode/commands/bootstrap/` (subdir), the previous order
+  // (postRemoveCleanup first, then uninstallBootstrap) left
+  // `.opencode/commands/` and `.opencode/` as orphan empty dirs after
+  // the bootstrap artifacts were finally removed — postRemoveCleanup saw
+  // the non-empty dirs and skipped. Iterating lifecycle.remove first
+  // guarantees postRemoveCleanup finds the parent dirs empty and removes
+  // them. (This is the M1 fix; the lifecycle registry preserves the order
+  // but generalizes the mechanism so future extras get the same
+  // treatment.)
+  for (const hook of lifecycle.remove) {
+    try {
+      await hook({ target });
+    } catch (err) {
+      console.warn(`[opencode] lifecycle hook failed: ${err.message}. Continuing.`);
+    }
+  }
+
   await postRemoveCleanup(target, state, 'opencode', {
     hadMcps,
     agentsMdRerendered,
@@ -215,6 +274,17 @@ export async function remove({ target, source, config, types }) {
  *   this tool — keep it (don't delete).
  */
 async function postRemoveCleanup(target, state, toolName, options = {}) {
+  // .opencode/commands is the immediate parent of the bootstrap artifacts
+  // (`bootstrap.md` + `bootstrap/` subdir). After uninstallBootstrap deletes
+  // both, .opencode/commands/ is empty but still EXISTS — so without this
+  // explicit cleanup, the .opencode/ removeIfEmpty below sees a non-empty
+  // parent (it has `commands/` as a subdir) and skips, leaving
+  // .opencode/commands/ + .opencode/ as orphan dirs after `remove --purge`.
+  // claude-code's bootstrap lives one level deeper (under .claude/skills/),
+  // so its postRemoveCleanup catches the orphan naturally.
+  // No-op when .opencode/commands/ is non-empty (user-added commands) or
+  // already absent (bootstrap never installed).
+  await removeIfEmpty(`${target}/.opencode/commands`);
   await removeIfEmpty(`${target}/.opencode/agents`);
   await removeIfEmpty(`${target}/.opencode/skills`);
   await removeIfEmpty(`${target}/.opencode`);
@@ -297,22 +367,24 @@ subtask: false
 `;
 
 /**
- * Installs the OpenCode /bootstrap command from <source>/prompts/bootstrap/.
+ * Install or re-install the bootstrap command in the target project.
+ *
+ * By default (force=false): idempotent — skip if the bootstrap subdir
+ * already exists. Safe for `init` (don't clobber existing).
+ *
+ * With force=true: wipe and recreate the bootstrap artifacts
+ * (`bootstrap.md` + `bootstrap/` subdir) unconditionally. Required for
+ * `sync` so source modifications propagate.
  *
  * OpenCode uses the `@filename` syntax to reference files relative to the
  * command's location (unlike Claude Code, which uses `./filename`).
  *
- * Idempotency: if `<target>/.opencode/commands/bootstrap.md` or
- * `<target>/.opencode/commands/bootstrap/` already exists, it does NOT
- * overwrite — it aborts silently and logs a skip message. To force a
- * reinstall, delete the file/directory manually or run `sync` afterwards.
- *
  * @param {{source: string, target: string}} args
- *   source: absolute path to the toolkit's source/ directory
- *   target: absolute path to the target project directory
- * @returns {Promise<{installed: boolean}>} installed=false when it already existed
+ * @param {{force?: boolean}} [options]
+ * @returns {Promise<{installed: boolean}>}
  */
-export async function installBootstrap({ source, target }) {
+export async function installBootstrap({ source, target }, options = {}) {
+  const { force = false } = options;
   const bootstrapFile = join(target, OPENCODE_BOOTSTRAP_FILE);
   const bootstrapSubdir = join(target, OPENCODE_BOOTSTRAP_SUBDIR);
 
@@ -323,11 +395,21 @@ export async function installBootstrap({ source, target }) {
   // (the command references files that don't exist) and reinstalling
   // recovers it.
   if (existsSync(bootstrapSubdir)) {
-    console.log(
-      `  → Bootstrap command already exists at ${OPENCODE_BOOTSTRAP_FILE}. ` +
-      `Skipping (delete the file/dir to reinstall).`
-    );
-    return { installed: false };
+    if (!force) {
+      console.log(
+        `  → Bootstrap command already exists at ${OPENCODE_BOOTSTRAP_FILE}. ` +
+        `Skipping (delete the file/dir to reinstall).`
+      );
+      return { installed: false };
+    }
+    // force=true: wipe existing artifacts so source changes propagate.
+    // The outer existsSync check guarantees bootstrapSubdir exists here,
+    // so no inner check needed. `rm({force:true})` is a no-op on missing
+    // paths but skipping the redundant check keeps the intent obvious.
+    await rm(bootstrapSubdir, { recursive: true, force: true });
+    if (existsSync(bootstrapFile)) {
+      await rm(bootstrapFile, { force: true });
+    }
   }
 
   const { conductor, supportingFiles } = readBootstrapSource(source);
@@ -351,6 +433,64 @@ export async function installBootstrap({ source, target }) {
 
   return { installed: true };
 }
+
+/**
+ * Remove the bootstrap command from the target project.
+ * Idempotent: skip if neither bootstrap artifact exists.
+ *
+ * Removes `.opencode/commands/bootstrap.md` and the supporting files
+ * in `.opencode/commands/bootstrap/`. Robust to orphan states — deletes
+ * whichever artifacts exist, leaves the filesystem clean either way.
+ *
+ * @param {{target: string}} args
+ * @returns {Promise<{removed: boolean}>} true if any artifact was removed,
+ *   false if neither existed
+ */
+export async function uninstallBootstrap({ target }) {
+  const bootstrapFile = join(target, OPENCODE_BOOTSTRAP_FILE);
+  const bootstrapSubdir = join(target, OPENCODE_BOOTSTRAP_SUBDIR);
+
+  if (!existsSync(bootstrapFile) && !existsSync(bootstrapSubdir)) {
+    return { removed: false };
+  }
+
+  if (existsSync(bootstrapSubdir)) {
+    await rm(bootstrapSubdir, { recursive: true, force: true });
+  }
+  if (existsSync(bootstrapFile)) {
+    await rm(bootstrapFile, { force: true });
+  }
+  return { removed: true };
+}
+
+// ─── Lifecycle registry ───────────────────────────────────────────────────
+//
+// Lifecycle hooks: adding a new extra (lint rules, security hooks,
+// templates) = push to the right arrays. install/sync/remove iterate them
+// generically with try/catch + console.warn so a misbehaving extra doesn't
+// break the whole lifecycle. This makes the adapter "open to extensions":
+// a new extra is one push, not 12 points of maintenance across the two
+// adapters.
+//
+// install() runs lifecycle.install hooks AFTER installing agents/skills/
+// mcps/rules and BEFORE writeState. sync() reuses install() so it
+// automatically picks up install-time extras; lifecycle.sync is reserved
+// for extras that should fire only on sync, not on a fresh install. Note:
+// installBootstrap is intentionally NOT pushed to lifecycle.sync — the
+// direct call in sync() (with force=true) handles the wipe + recreate.
+// Future sync-only extras (e.g., lint rules) should push to lifecycle.sync.
+// remove() runs lifecycle.remove BEFORE postRemoveCleanup to preserve the
+// M1 ordering invariant (extras that may leave empty parents must run
+// before the cleanup pass that sweeps them up). The explicit
+// `removeIfEmpty('.opencode/commands')` in postRemoveCleanup stays there
+// — it is part of the structural cleanup, not an extra.
+const lifecycle = createLifecycle();
+lifecycle.install.push(installBootstrap);
+// lifecycle.sync is intentionally empty — reserved for future sync-only
+// extras (e.g., lint rules). Do NOT push installBootstrap here.
+lifecycle.remove.push(uninstallBootstrap);
+
+export { lifecycle };
 
 async function installAgents(source, target, state) {
   const agents = listAgents(source);

@@ -154,3 +154,65 @@ test('opencode: installBootstrap is idempotent (second call detects existing, no
   const secondMtime = (await lstat(commandMdPath)).mtimeMs;
   assert.equal(secondMtime, firstMtime, 'command file mtime unchanged (not rewritten)');
 });
+
+// ─── uninstallBootstrap ─────────────────────────────────────────────────
+//
+// uninstallBootstrap({target}) removes the OpenCode /bootstrap command
+// artifacts: `.opencode/commands/bootstrap.md` + `.opencode/commands/bootstrap/`
+// (supporting files). It is invoked by adapter.remove() so `ai-toolkit remove`
+// cleans up the bootstrap command (preventing orphaned files after removal).
+//
+// Idempotent: returns {removed: false} when neither artifact exists, so it's
+// safe to call even when installBootstrap was never run. Robust to orphan
+// states (one of the two artifacts deleted independently — should still clean
+// up the surviving one).
+
+import { mkdirSync, writeFileSync } from 'node:fs';
+
+test('opencode: uninstallBootstrap is exported as a function', async () => {
+  const adapter = await import(ADAPTER_PATH);
+  assert.equal(typeof adapter.uninstallBootstrap, 'function', 'uninstallBootstrap must be exported');
+});
+
+test('opencode: uninstallBootstrap removes bootstrap.md and bootstrap/ subdir', async () => {
+  // Setup: create both artifacts manually (faster than a real
+  // installBootstrap round-trip; isolates uninstallBootstrap from
+  // installBootstrap so a regression in either surfaces independently).
+  const tmpDir = await mkTmp();
+  const commandFile = join(tmpDir, '.opencode/commands/bootstrap.md');
+  const supportDir = join(tmpDir, '.opencode/commands/bootstrap');
+  mkdirSync(supportDir, { recursive: true });
+  writeFileSync(commandFile, '# dummy');
+  writeFileSync(join(supportDir, '01-pre-flight.md'), '# dummy');
+  assert.ok(await fileExists(commandFile), 'pre: bootstrap.md exists');
+  assert.ok(await fileExists(supportDir), 'pre: bootstrap/ subdir exists');
+
+  const adapter = await import(ADAPTER_PATH);
+  const result = await adapter.uninstallBootstrap({ target: tmpDir });
+
+  assert.equal(result.removed, true, 'returns {removed: true} when artifacts existed');
+  assert.equal(await fileExists(commandFile), false, 'bootstrap.md removed');
+  assert.equal(await fileExists(supportDir), false, 'bootstrap/ subdir removed');
+});
+
+test('opencode: uninstallBootstrap handles orphan state (only one artifact present)', async () => {
+  // Setup: only the command file exists, subdir is absent (e.g. someone
+  // deleted the subdir manually). uninstallBootstrap must still clean up
+  // the surviving artifact without throwing.
+  const tmpDir = await mkTmp();
+  const commandFile = join(tmpDir, '.opencode/commands/bootstrap.md');
+  mkdirSync(join(tmpDir, '.opencode/commands'), { recursive: true });
+  writeFileSync(commandFile, '# orphan command');
+  assert.ok(await fileExists(commandFile), 'pre: bootstrap.md exists');
+  assert.equal(
+    await fileExists(join(tmpDir, '.opencode/commands/bootstrap')),
+    false,
+    'pre: bootstrap/ subdir absent (orphan state)'
+  );
+
+  const adapter = await import(ADAPTER_PATH);
+  const result = await adapter.uninstallBootstrap({ target: tmpDir });
+
+  assert.equal(result.removed, true, 'returns {removed: true} when command file exists');
+  assert.equal(await fileExists(commandFile), false, 'orphan bootstrap.md removed');
+});

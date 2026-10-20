@@ -1,6 +1,6 @@
 ---
 name: ui-ux-designer
-description: "Designs UI from scratch without Figma based on a functional brief: emits tokens, ASCII layout, mobile+desktop variants, edge cases and a11y WCAG AA. Does NOT implement code, does NOT do QA on implemented UI. Multi-runtime."
+description: "Designs UI from scratch without Figma based on a functional brief: emits tokens, ASCII layout, mobile+desktop variants, edge cases and a11y WCAG AA. Does NOT implement code, does NOT do QA on implemented UI. Multi-rt"
 mode: primary
 temperature: 0.4
 tools:

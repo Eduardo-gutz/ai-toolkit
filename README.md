@@ -56,12 +56,25 @@ ai-toolkit/
 4. **No generated files are committed** to consuming projects — regenerate
    with the CLI.
 
+## Init behavior
+
+`init` manages the target project's `.gitignore` for you. After installing
+for each tool that succeeded, it ensures the file contains a managed
+marker block (`# >>> ai-toolkit (managed — do not edit between markers) >>>` /
+`# <<< ai-toolkit <<<`) listing the per-tool directories (`.opencode/`,
+`.claude/`), the rules body (`AGENTS.md`), `CLAUDE.md` (when Claude Code
+is installed), and the state file (`.ai-toolkit.json` by default, or your
+custom `install.state_file`). Existing user content outside the markers is
+preserved verbatim, and a second `init` against the same project is a
+no-op (the block is replaced in place, never duplicated). `sync` and
+`remove` deliberately leave `.gitignore` alone.
+
 ## Status
 
 **Shipped**: Phase 0 (design) + Phase 1 (opencode adapter + CLI) + Phase 2 (claude-code adapter + shared helpers) + Phase 0.5 (security hardening: path traversal closed, adapter injection closed for all commands after loadAdapter migration, value-less flag crashes fixed).
 
 **Next**: Phase 1.5 — interactive init fix (`select` → `checkbox`) + `CLAUDE.md` with `@AGENTS.md` import.
 
-Test status: **330/330 passing**.
+Test status: **380/380 passing** (+11 gitignore-management tests).
 
 See `.context/WHY.md` for the full design history and roadmap.

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { initCommand, ALL_TYPES } from '../bin/commands/init.mjs';
+import { initCommand, ensureToolkitGitignore, ALL_TYPES } from '../bin/commands/init.mjs';
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -581,6 +581,15 @@ test('init: warns (no throw) when default_tools has no valid entries', async () 
       configPath: '/tmp/x.json',
       projectDir,
       toolkitRoot: '/nonexistent',
+    }).then(() => {
+      // Plan §2 Acceptance #5: when no tool actually succeeded (warn+return
+      // branch), ensureToolkitGitignore MUST NOT be called — .gitignore stays
+      // untouched. A regression that removed the early `return` would call the
+      // helper with installedTools=∅ and create a (near-empty) marker block.
+      assert.ok(
+        !existsSync(join(projectDir, '.gitignore')),
+        '.gitignore must NOT exist when no tools were installed (warn+return branch)'
+      );
     });
     // No throw — exit 0 with warning.
   });
@@ -862,5 +871,336 @@ test('init: rejects --tools=mixed valid+path-traversal (loadAdapter whitelist)',
     });
     // opencode installed (no-op success), evil rejected by loadAdapter (warn+skip).
     // No throw because at least one succeeded.
+  });
+});
+
+// ─── .gitignore management ──────────────────────────────────────
+//
+// Marker block format (em-dash U+2014 — copy, don't retype):
+//   # >>> ai-toolkit (managed — do not edit between markers) >>>
+//   <patterns>
+//   # <<< ai-toolkit <<<
+//
+// Pattern set per plan (human-approved):
+//   /.opencode/      if opencode in installedTools
+//   /.claude/        if claude-code in installedTools
+//   AGENTS.md        always
+//   CLAUDE.md        if claude-code in installedTools
+//   <stateFileRelPath>  always (basename → leading-/, contains / → leading-./)
+
+const MARKER_OPEN = '# >>> ai-toolkit (managed — do not edit between markers) >>>';
+const MARKER_CLOSE = '# <<< ai-toolkit <<<';
+
+// ─── Unit tests: ensureToolkitGitignore called directly ─────────
+
+test('ensureToolkitGitignore: creates .gitignore when missing', async () => {
+  await withTempDir('aitk-ensure-', (projectDir) => {
+    return ensureToolkitGitignore(
+      projectDir,
+      new Set(['opencode', 'claude-code']),
+      '.ai-toolkit.json'
+    ).then((result) => {
+      assert.ok(existsSync(join(projectDir, '.gitignore')), '.gitignore should exist');
+      const content = readFileSync(join(projectDir, '.gitignore'), 'utf8');
+      assert.ok(content.includes(MARKER_OPEN), 'marker open comment present');
+      assert.ok(content.includes(MARKER_CLOSE), 'marker close comment present');
+      assert.ok(content.includes('/.opencode/'), 'opencode pattern present');
+      assert.ok(content.includes('/.claude/'), 'claude pattern present');
+      assert.ok(content.includes('AGENTS.md'), 'AGENTS.md pattern present');
+      assert.ok(content.includes('CLAUDE.md'), 'CLAUDE.md pattern present');
+      assert.ok(content.includes('/.ai-toolkit.json'), 'state file pattern present');
+      assert.equal(result.action, 'created');
+      assert.equal(result.patternCount, 5);
+    });
+  });
+});
+
+test('ensureToolkitGitignore: appends marker block to existing file without disturbing user content', async () => {
+  await withTempDir('aitk-ensure-', (projectDir) => {
+    const userContent = 'node_modules/\n.env\n# my custom rules\n*.log\n';
+    writeFileSync(join(projectDir, '.gitignore'), userContent);
+
+    return ensureToolkitGitignore(
+      projectDir,
+      new Set(['opencode', 'claude-code']),
+      '.ai-toolkit.json'
+    ).then((result) => {
+      const content = readFileSync(join(projectDir, '.gitignore'), 'utf8');
+      // Original 4 lines still present in order
+      assert.ok(content.includes('node_modules/'), 'node_modules preserved');
+      assert.ok(content.includes('.env'), '.env preserved');
+      assert.ok(content.includes('# my custom rules'), 'custom comment preserved');
+      assert.ok(content.includes('*.log'), '*.log preserved');
+      // Marker block follows user content
+      const userEnd = content.indexOf('*.log\n') + '*.log\n'.length;
+      const markerStart = content.indexOf(MARKER_OPEN);
+      assert.ok(markerStart > userEnd, 'marker block follows user content');
+      // Exactly one blank line between user content and marker block
+      const between = content.slice(userEnd, markerStart);
+      assert.equal(between, '\n', 'exactly one blank line between user content and marker block');
+      // Marker block contains all 5 patterns
+      assert.ok(content.includes('/.opencode/'), 'opencode pattern present');
+      assert.ok(content.includes('/.claude/'), 'claude pattern present');
+      assert.ok(content.includes('AGENTS.md'), 'AGENTS.md pattern present');
+      assert.ok(content.includes('CLAUDE.md'), 'CLAUDE.md pattern present');
+      assert.ok(content.includes('/.ai-toolkit.json'), 'state file pattern present');
+      assert.equal(result.action, 'updated');
+    });
+  });
+});
+
+test('ensureToolkitGitignore: replaces existing marker block with new patterns (no duplicate blocks)', async () => {
+  await withTempDir('aitk-ensure-', (projectDir) => {
+    // Pre-write a file with only opencode in the marker block (as if from
+    // a previous `init --tools=opencode`).
+    const userContent = 'node_modules/\n';
+    const oldBlock = `${MARKER_OPEN}\n/.opencode/\nAGENTS.md\n/.ai-toolkit.json\n${MARKER_CLOSE}\n`;
+    writeFileSync(join(projectDir, '.gitignore'), userContent + oldBlock);
+
+    return ensureToolkitGitignore(
+      projectDir,
+      new Set(['opencode', 'claude-code']),
+      '.ai-toolkit.json'
+    ).then((result) => {
+      const content = readFileSync(join(projectDir, '.gitignore'), 'utf8');
+      // Marker block appears exactly once
+      const openMatches = content.split(MARKER_OPEN).length - 1;
+      assert.equal(openMatches, 1, 'marker block appears exactly once');
+      const closeMatches = content.split(MARKER_CLOSE).length - 1;
+      assert.equal(closeMatches, 1, 'marker close appears exactly once');
+      // Contains both /,patterns (not just the old one)
+      assert.ok(content.includes('/.opencode/'), 'opencode pattern present');
+      assert.ok(content.includes('/.claude/'), 'claude pattern now present');
+      // user content preserved
+      assert.ok(content.startsWith(userContent), 'user content at start');
+      assert.equal(result.action, 'updated');
+    });
+  });
+});
+
+test('ensureToolkitGitignore: idempotent — second call leaves file unchanged', async () => {
+  await withTempDir('aitk-ensure-', (projectDir) => {
+    const tools = new Set(['opencode', 'claude-code']);
+    const stateFile = '.ai-toolkit.json';
+
+    return ensureToolkitGitignore(projectDir, tools, stateFile).then(() => {
+      const content1 = readFileSync(join(projectDir, '.gitignore'), 'utf8');
+      return ensureToolkitGitignore(projectDir, tools, stateFile).then((r2) => {
+        const content2 = readFileSync(join(projectDir, '.gitignore'), 'utf8');
+        assert.equal(content2, content1, 'file content identical after second call');
+        assert.equal(r2.action, 'unchanged', 'second call returns action=unchanged');
+      });
+    });
+  });
+});
+
+test('ensureToolkitGitignore: empty installedTools yields empty pattern block', async () => {
+  await withTempDir('aitk-ensure-', (projectDir) => {
+    return ensureToolkitGitignore(projectDir, new Set(), '.ai-toolkit.json').then((result) => {
+      assert.ok(existsSync(join(projectDir, '.gitignore')), '.gitignore created');
+      const content = readFileSync(join(projectDir, '.gitignore'), 'utf8');
+      // Marker block exists
+      assert.ok(content.includes(MARKER_OPEN), 'marker open present');
+      assert.ok(content.includes(MARKER_CLOSE), 'marker close present');
+      // No patterns between markers (only blank lines)
+      const between = content.slice(
+        content.indexOf(MARKER_OPEN) + MARKER_OPEN.length,
+        content.indexOf(MARKER_CLOSE)
+      );
+      assert.match(between, /^[\n]*$/, 'no patterns between markers, only whitespace');
+      assert.equal(result.action, 'created');
+      assert.equal(result.patternCount, 0);
+    });
+  });
+});
+
+test('ensureToolkitGitignore: respects custom stateFileRelPath (path with /)', async () => {
+  await withTempDir('aitk-ensure-', (projectDir) => {
+    return ensureToolkitGitignore(
+      projectDir,
+      new Set(['opencode']),
+      'custom/state.json'
+    ).then((result) => {
+      const content = readFileSync(join(projectDir, '.gitignore'), 'utf8');
+      assert.ok(content.includes('./custom/state.json'), 'state file written with leading ./');
+      assert.ok(!content.includes('/.custom/state.json'), 'state file NOT written with leading /');
+      assert.ok(!content.includes('/.ai-toolkit.json'), 'default state file NOT included');
+      assert.equal(result.patternCount, 3); // /.opencode/, AGENTS.md, ./custom/state.json
+    });
+  });
+});
+
+test('ensureToolkitGitignore: handles .gitignore without trailing newline', async () => {
+  await withTempDir('aitk-ensure-', (projectDir) => {
+    // Pre-write file WITHOUT trailing newline
+    writeFileSync(join(projectDir, '.gitignore'), 'node_modules/');
+
+    return ensureToolkitGitignore(
+      projectDir,
+      new Set(['opencode']),
+      '.ai-toolkit.json'
+    ).then((result) => {
+      const content = readFileSync(join(projectDir, '.gitignore'), 'utf8');
+      // Last user line should not be glued to the marker
+      assert.ok(content.includes('node_modules/\n\n# >>> ai-toolkit'),
+        'one blank line between last user line and marker block, NOT glued');
+      // Marker block present
+      assert.ok(content.includes(MARKER_OPEN), 'marker present');
+      assert.equal(result.action, 'updated');
+    });
+  });
+});
+
+// ─── Integration tests: full initCommand ─────────────────────────
+
+test('init (integration): creates .gitignore with marker block when missing', async () => {
+  await withTempDir('aitk-init-gitignore-', (projectDir) => {
+    const toolkitRoot = '/Users/eduardogutierrez/Desktop/VortexSound_back/ai-toolkit';
+    const config = JSON.parse(readFileSync(`${toolkitRoot}/ai-toolkit.config.json`, 'utf8'));
+    config.default_tools = ['opencode', 'claude-code'];
+    return initCommand({
+      flags: {},
+      config,
+      configPath: `${toolkitRoot}/ai-toolkit.config.json`,
+      projectDir,
+      toolkitRoot,
+    }).then(() => {
+      // Existing asserts still pass
+      assert.ok(existsSync(join(projectDir, '.opencode')), '.opencode/ exists');
+      assert.ok(existsSync(join(projectDir, '.claude')), '.claude/ exists');
+      // New: .gitignore with marker block + all 5 patterns
+      assert.ok(existsSync(join(projectDir, '.gitignore')), '.gitignore exists');
+      const content = readFileSync(join(projectDir, '.gitignore'), 'utf8');
+      assert.ok(content.includes(MARKER_OPEN), 'marker open present');
+      assert.ok(content.includes('/.opencode/'), 'opencode pattern present');
+      assert.ok(content.includes('/.claude/'), 'claude pattern present');
+      assert.ok(content.includes('AGENTS.md'), 'AGENTS.md pattern present');
+      assert.ok(content.includes('CLAUDE.md'), 'CLAUDE.md pattern present');
+      assert.ok(content.includes('/.ai-toolkit.json'), 'state file pattern present');
+    });
+  });
+});
+
+test('init (integration): preserves user .gitignore content outside marker block', async () => {
+  await withTempDir('aitk-init-preserve-', (projectDir) => {
+    // Pre-write user .gitignore
+    writeFileSync(join(projectDir, '.gitignore'), 'node_modules/\n# custom\n');
+
+    const toolkitRoot = '/Users/eduardogutierrez/Desktop/VortexSound_back/ai-toolkit';
+    const config = JSON.parse(readFileSync(`${toolkitRoot}/ai-toolkit.config.json`, 'utf8'));
+    config.default_tools = ['opencode', 'claude-code'];
+    return initCommand({
+      flags: {},
+      config,
+      configPath: `${toolkitRoot}/ai-toolkit.config.json`,
+      projectDir,
+      toolkitRoot,
+    }).then(() => {
+      const content = readFileSync(join(projectDir, '.gitignore'), 'utf8');
+      // User content preserved
+      assert.ok(content.includes('node_modules/'), 'node_modules preserved');
+      assert.ok(content.includes('# custom'), 'custom comment preserved');
+      // Marker block follows
+      assert.ok(content.includes(MARKER_OPEN), 'marker block appended');
+      // User lines precede marker block
+      assert.ok(content.indexOf('node_modules/') < content.indexOf(MARKER_OPEN),
+        'user content precedes marker block');
+    });
+  });
+});
+
+test('init (integration): second init does not duplicate marker block', async () => {
+  await withTempDir('aitk-init-twice-', (projectDir) => {
+    const toolkitRoot = '/Users/eduardogutierrez/Desktop/VortexSound_back/ai-toolkit';
+    const config = JSON.parse(readFileSync(`${toolkitRoot}/ai-toolkit.config.json`, 'utf8'));
+    config.default_tools = ['opencode', 'claude-code'];
+
+    const runInit = () => initCommand({
+      flags: {},
+      config,
+      configPath: `${toolkitRoot}/ai-toolkit.config.json`,
+      projectDir,
+      toolkitRoot,
+    });
+
+    return runInit().then(() => runInit()).then(() => {
+      const content = readFileSync(join(projectDir, '.gitignore'), 'utf8');
+      const markerCount = content.split(MARKER_OPEN).length - 1;
+      assert.equal(markerCount, 1, 'marker block appears exactly once');
+    });
+  });
+});
+
+test('init (integration): tool-set change between two inits updates block (single block, both patterns)', async () => {
+  // Plan §2 Acceptance #2: running `init` with `default_tools=['opencode']` and
+  // then again with `default_tools=['opencode','claude-code']` must yield a
+  // single marker block containing BOTH per-tool patterns (in-place update,
+  // not a second block appended).
+  await withTempDir('aitk-init-toolchange-', (projectDir) => {
+    const toolkitRoot = '/Users/eduardogutierrez/Desktop/VortexSound_back/ai-toolkit';
+    const baseConfig = JSON.parse(readFileSync(`${toolkitRoot}/ai-toolkit.config.json`, 'utf8'));
+
+    const runInitWith = (tools) => {
+      const config = { ...baseConfig, default_tools: tools };
+      return initCommand({
+        flags: {},
+        config,
+        configPath: `${toolkitRoot}/ai-toolkit.config.json`,
+        projectDir,
+        toolkitRoot,
+      });
+    };
+
+    return runInitWith(['opencode'])
+      .then(() => runInitWith(['opencode', 'claude-code']))
+      .then(() => {
+        const content = readFileSync(join(projectDir, '.gitignore'), 'utf8');
+        // Both per-tool patterns present — proves the 2nd init propagated the
+        // tool-set change into the block (not skipped, not bypassed).
+        assert.ok(content.includes('/.opencode/'), 'opencode pattern present after 2nd init');
+        assert.ok(content.includes('/.claude/'), 'claude pattern added by 2nd init');
+        // Single marker block — proves it was an in-place update, not an append.
+        const markerCount = content.split(MARKER_OPEN).length - 1;
+        assert.equal(markerCount, 1, 'marker block appears exactly once after tool-set change');
+      });
+  });
+});
+
+test('init (integration): does not touch .gitignore when all tools fail', async () => {
+  // F5 partial-failure pattern: adapter that always throws → installed === 0
+  // → init throws "All tools failed" → ensureToolkitGitignore MUST NOT run.
+  await withTempDir('aitk-init-fail-', (projectDir) => {
+    const fakeRoot = mkdtempSync(join(tmpdir(), 'aitk-toolkit-fail-'));
+    try {
+      mkdirSync(join(fakeRoot, 'adapters/broken'), { recursive: true });
+      writeFileSync(
+        join(fakeRoot, 'adapters/broken/adapter.mjs'),
+        `export async function install() { throw new Error('boom'); }`
+      );
+      const config = {
+        source: './source',
+        tools: { broken: {} },
+        default_tools: ['broken'],
+      };
+      return initCommand({
+        flags: {},
+        config,
+        configPath: '/x.json',
+        projectDir,
+        toolkitRoot: fakeRoot,
+      }).then(
+        () => { throw new Error('should have thrown'); },
+        (err) => {
+          assert.match(err.message, /All tools failed/);
+          // .gitignore must NOT exist — the helper was never called.
+          assert.ok(
+            !existsSync(join(projectDir, '.gitignore')),
+            '.gitignore must NOT exist when all tools fail'
+          );
+        }
+      );
+    } finally {
+      rmSync(fakeRoot, { recursive: true, force: true });
+    }
   });
 });

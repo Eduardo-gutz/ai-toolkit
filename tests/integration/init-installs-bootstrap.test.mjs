@@ -637,6 +637,36 @@ const FAKE_BOOTSTRAP_FILES = [
   '09-prune.md',
 ];
 
+// The greenfield pack ships its own supporting files + a defaults/ catalog.
+// The fake source must declare ALL of them, otherwise readPromptPack
+// refuses to read the pack and the lifecycle hook logs a warning.
+const FAKE_GREENFIELD_FILES = [
+  '00-conductor.md',
+  '01-pre-flight.md',
+  '02-interview.md',
+  '03-standards.md',
+  '04-stack.md',
+  '05-architecture.md',
+  '06-code-style.md',
+  '07-conventions.md',
+  '08-agents-md.md',
+  '09-prune.md',
+];
+
+const FAKE_GREENFIELD_ASSETS = [
+  'defaults/_baseline.md',
+  'defaults/node-typescript.md',
+  'defaults/python.md',
+  'defaults/react-native.md',
+  'defaults/react.md',
+  'defaults/nextjs.md',
+  'defaults/express.md',
+  'defaults/fastapi.md',
+  'defaults/php.md',
+  'defaults/android.md',
+  'defaults/ios.md',
+];
+
 async function buildFakeSourceDir({ withMarker = '' } = {}) {
   const fakeRoot = mkdtempSync(join(tmpdir(), 'aitk-sync-fake-src-'));
   const bootstrapSrcDir = join(fakeRoot, 'prompts/bootstrap');
@@ -652,6 +682,17 @@ async function buildFakeSourceDir({ withMarker = '' } = {}) {
   // byte, so any content works — they're not parsed.
   for (const name of FAKE_BOOTSTRAP_FILES.slice(1)) {
     writeFileSync(join(bootstrapSrcDir, name), `# ${name}\nStub content.\n`);
+  }
+
+  // The greenfield pack: same treatment. Every registered file must exist
+  // so readPromptPack() accepts the pack as a unit.
+  const greenfieldSrcDir = join(fakeRoot, 'prompts/greenfield');
+  mkdirSync(join(greenfieldSrcDir, 'defaults'), { recursive: true });
+  for (const name of FAKE_GREENFIELD_FILES) {
+    writeFileSync(join(greenfieldSrcDir, name), `# ${name}\nStub content.\n`);
+  }
+  for (const name of FAKE_GREENFIELD_ASSETS) {
+    writeFileSync(join(greenfieldSrcDir, name), `# ${name}\nStub content.\n`);
   }
 
   return { fakeRoot, bootstrapSrcDir };
@@ -742,6 +783,204 @@ test('sync: propagates source modifications to bootstrap (opencode)', async () =
     );
   } finally {
     rmSync(fakeRoot, { recursive: true, force: true });
+    rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+// ─── Greenfield pack: init / sync / remove ────────────────────────────────
+//
+// The greenfield pack is the generative counterpart of bootstrap. It is
+// installed by default through the same lifecycle.install mechanism, it is
+// re-created by sync, and it is uninstalled by remove — leaving no orphan
+// directories behind.
+
+test('init: --tools=claude-code creates .claude/skills/greenfield/', async () => {
+  const projectDir = mkdtempSync(join(tmpdir(), 'aitk-init-gf-cc-'));
+  try {
+    const config = makeConfig(['claude-code'], []);
+    await callInit(projectDir, config, { tools: 'claude-code' });
+
+    assert.ok(
+      existsSync(join(projectDir, '.claude/skills/greenfield/SKILL.md')),
+      '.claude/skills/greenfield/SKILL.md should exist after init'
+    );
+    assert.ok(
+      existsSync(join(projectDir, '.claude/skills/greenfield/01-pre-flight.md')),
+      'first supporting file should be copied'
+    );
+    assert.ok(
+      existsSync(join(projectDir, '.claude/skills/greenfield/09-prune.md')),
+      'last supporting file should be copied'
+    );
+    assert.ok(
+      existsSync(join(projectDir, '.claude/skills/greenfield/defaults/_baseline.md')),
+      'the defaults catalog should be copied'
+    );
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test('init: --tools=opencode creates .opencode/commands/greenfield.md + greenfield/', async () => {
+  const projectDir = mkdtempSync(join(tmpdir(), 'aitk-init-gf-oc-'));
+  try {
+    const config = makeConfig(['opencode'], []);
+    await callInit(projectDir, config, { tools: 'opencode' });
+
+    assert.ok(
+      existsSync(join(projectDir, '.opencode/commands/greenfield.md')),
+      '.opencode/commands/greenfield.md should exist after init'
+    );
+    assert.ok(
+      existsSync(join(projectDir, '.opencode/commands/greenfield/01-pre-flight.md')),
+      'first supporting file should be copied under .opencode/commands/greenfield/'
+    );
+    assert.ok(
+      existsSync(join(projectDir, '.opencode/commands/greenfield/defaults/_baseline.md')),
+      'the defaults catalog should be copied'
+    );
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test('sync: re-creates greenfield after the target dir was removed (claude-code)', async () => {
+  const projectDir = mkdtempSync(join(tmpdir(), 'aitk-sync-gf-cc-'));
+  try {
+    const config = makeConfig(['claude-code'], []);
+    await callInit(projectDir, config, { tools: 'claude-code' });
+
+    const greenfieldDir = join(projectDir, '.claude/skills/greenfield');
+    assert.ok(existsSync(join(greenfieldDir, 'SKILL.md')), 'pre: greenfield created by init');
+
+    rmSync(greenfieldDir, { recursive: true, force: true });
+    assert.equal(existsSync(greenfieldDir), false, 'pre: greenfield dir removed');
+
+    const adapter = await import(CLAUDE_ADAPTER_PATH);
+    await adapter.sync({
+      source: join(TOOLKIT_ROOT, 'source'),
+      target: projectDir,
+      config,
+      types: ['agents', 'skills', 'mcps', 'rules'],
+    });
+
+    assert.ok(
+      existsSync(join(greenfieldDir, 'SKILL.md')),
+      'sync re-created .claude/skills/greenfield/SKILL.md'
+    );
+    assert.ok(
+      existsSync(join(greenfieldDir, 'defaults/_baseline.md')),
+      'sync re-created the greenfield catalog assets'
+    );
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test('sync: re-creates greenfield after the target dir was removed (opencode)', async () => {
+  const projectDir = mkdtempSync(join(tmpdir(), 'aitk-sync-gf-oc-'));
+  try {
+    const config = makeConfig(['opencode'], []);
+    await callInit(projectDir, config, { tools: 'opencode' });
+
+    const greenfieldDir = join(projectDir, '.opencode/commands/greenfield');
+    assert.ok(existsSync(join(projectDir, '.opencode/commands/greenfield.md')), 'pre: greenfield.md created by init');
+
+    rmSync(greenfieldDir, { recursive: true, force: true });
+    rmSync(join(projectDir, '.opencode/commands/greenfield.md'), { force: true });
+    assert.equal(existsSync(greenfieldDir), false, 'pre: greenfield dir removed');
+
+    const adapter = await import(OPENCODE_ADAPTER_PATH);
+    await adapter.sync({
+      source: join(TOOLKIT_ROOT, 'source'),
+      target: projectDir,
+      config,
+      types: ['agents', 'skills', 'mcps', 'rules'],
+    });
+
+    assert.ok(
+      existsSync(join(projectDir, '.opencode/commands/greenfield.md')),
+      'sync re-created .opencode/commands/greenfield.md'
+    );
+    assert.ok(
+      existsSync(join(greenfieldDir, 'defaults/_baseline.md')),
+      'sync re-created the greenfield catalog assets'
+    );
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test('remove: deletes the greenfield skill and leaves no orphan dir (claude-code)', async () => {
+  const projectDir = mkdtempSync(join(tmpdir(), 'aitk-remove-gf-cc-'));
+  try {
+    const config = makeConfig(['claude-code'], []);
+    await callInit(projectDir, config, { tools: 'claude-code' });
+
+    const greenfieldDir = join(projectDir, '.claude/skills/greenfield');
+    assert.ok(existsSync(join(greenfieldDir, 'SKILL.md')), 'pre: greenfield created by init');
+
+    const adapter = await import(CLAUDE_ADAPTER_PATH);
+    await adapter.remove({
+      target: projectDir,
+      source: join(TOOLKIT_ROOT, 'source'),
+      config,
+    });
+
+    assert.equal(
+      existsSync(greenfieldDir),
+      false,
+      'remove deleted .claude/skills/greenfield/ (remove invokes uninstallGreenfield)'
+    );
+    // No orphan parent dir left behind once every skill was removed.
+    assert.equal(
+      existsSync(join(projectDir, '.claude/skills')),
+      false,
+      'remove left no orphan .claude/skills/ directory'
+    );
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test('remove: deletes the greenfield command and leaves no orphan dir (opencode)', async () => {
+  const projectDir = mkdtempSync(join(tmpdir(), 'aitk-remove-gf-oc-'));
+  try {
+    const config = makeConfig(['opencode'], []);
+    await callInit(projectDir, config, { tools: 'opencode' });
+
+    assert.ok(
+      existsSync(join(projectDir, '.opencode/commands/greenfield.md')),
+      'pre: greenfield.md created by init'
+    );
+    assert.ok(
+      existsSync(join(projectDir, '.opencode/commands/greenfield/')),
+      'pre: greenfield/ subdir created by init'
+    );
+
+    const adapter = await import(OPENCODE_ADAPTER_PATH);
+    await adapter.remove({
+      target: projectDir,
+      source: join(TOOLKIT_ROOT, 'source'),
+      config,
+    });
+
+    assert.equal(
+      existsSync(join(projectDir, '.opencode/commands/greenfield.md')),
+      false,
+      'remove deleted .opencode/commands/greenfield.md'
+    );
+    assert.equal(
+      existsSync(join(projectDir, '.opencode/commands/greenfield')),
+      false,
+      'remove deleted .opencode/commands/greenfield/'
+    );
+    assert.equal(
+      existsSync(join(projectDir, '.opencode/commands')),
+      false,
+      'remove left no orphan .opencode/commands/ directory'
+    );
+  } finally {
     rmSync(projectDir, { recursive: true, force: true });
   }
 });

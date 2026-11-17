@@ -1,9 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { resolve, join } from 'node:path';
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dispatch, shouldRunMain } from '../bin/ai-toolkit.mjs';
+
+const CLI = resolve(import.meta.dirname, '../bin/ai-toolkit.mjs');
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -451,4 +454,26 @@ test('dispatch: list → Unknown command (uses real registry)', async () => {
   assert.equal(exitCode, 1);
   assert.match(stderr, /Unknown command: list/);
   assert.match(stdout, /Usage: ai-toolkit/);
+});
+test('cli: a --help flag never triggers an action', () => {
+  // `init --help` used to install into the current directory, and
+  // `sync --help` used to rewrite it. Asking for help must never change
+  // anything on disk.
+  for (const cmd of ['init', 'sync', 'remove', 'validate']) {
+    const result = spawnSync(process.execPath, [CLI, cmd, '--help'], {
+      encoding: 'utf8',
+      cwd: mkdtempSync(join(tmpdir(), 'aitk-help-')),
+    });
+
+    assert.equal(result.status, 0,
+      `${cmd} --help must exit 0 — stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+    assert.match(result.stdout, /Usage:/,
+      `${cmd} --help must print the usage text`);
+    assert.doesNotMatch(result.stdout, /Installing for/,
+      `${cmd} --help must not install anything`);
+    assert.doesNotMatch(result.stdout, /Syncing ai-toolkit/,
+      `${cmd} --help must not sync anything`);
+    assert.doesNotMatch(result.stdout, /Will remove all resources/,
+      `${cmd} --help must not remove anything`);
+  }
 });

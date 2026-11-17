@@ -127,6 +127,8 @@ When two principles conflict, this is the hierarchy:
 - **Identifier**: kebab-case of the title (e.g., `001-export-csv`).
 - **Mode A**: `.tasks/001-export-csv/001-export-csv.md`
 - **Mode B**: `.tasks/001-export-csv/001-frontend.md`, `001-backend.md`, `001-db-migration.md`, etc.
+- **Plan artifact**: the implementation plan produced by `task-planner` is written as `plan.md` in the same `.tasks/<prefix>-<id>/` folder.
+- **Shared numbering**: when no user story exists, `task-planner` creates the folder using the next available 3-digit number (same rule as the builder, re-scanned at write time). **Neither agent reuses a number whose folder already exists**: the builder re-scans `.tasks/` before creating a folder; the planner re-scans it immediately before writing.
 - **Versioning**: overwrite the US if iterating. The US is a planning artifact, not historical documentation.
 
 **Dual mode exit criterion**: `.tasks/<id>.md` file(s) created with all sections complete + mini-handoff emitted + correct numbering.

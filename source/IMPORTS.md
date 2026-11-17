@@ -31,5 +31,5 @@ Copied verbatim from zuma_pos/.opencode/ (2026-08-21). These will be adapted ove
 - `AGENTS.md` — project rules for zuma_pos, not the toolkit.
 - `skills-lock.json` — project metadata.
 - `.opencode/package.json`, `.opencode/package-lock.json`, `.opencode/node_modules/` — opencode runtime.
-- `.opencode/plans/` — generated implementation plans.
+- `.opencode/plans/` — generated implementation plans. **Not imported**; kept as a historical record of the `zuma_pos` repo. Plans now live at `.tasks/<prefix>-<id>/plan.md`.
 - `.opencode/skills/adb-qa-workspace/` — workspace artifacts from a specific iteration (review.html, grading JSON).

@@ -167,7 +167,7 @@ If any is missing, **stop and report to the human** — do not delegate to an ag
 
 1. Invoke `task-planner` directly with a US or description
 2. Receive the plan + mini-handoff
-3. Decide to pass it to the orchestator (path to `.opencode/plans/<slug>.md`) or use it directly with the coder
+3. Decide to pass it to the orchestator (path to the plan inside the task folder, `.tasks/<prefix>-<id>/plan.md`) or use it directly with the coder
 
 **The orchestator has NO visibility** on standalone invocations of the planner. If the dev invokes the planner outside the orchestator and then passes the plan to the orchestator, the latter treats it as "already written plan" (without Phase 0.5).
 

@@ -14,6 +14,9 @@ tools:
 permission:
   edit:
     "*": deny
+  write:
+    "*": deny
+    ".tasks/**": allow
   bash:
     "*": ask
     "git status*": allow
@@ -24,6 +27,7 @@ permission:
     "git rev-parse*": allow
     "ls *": allow
     "cat *": allow
+    "mkdir -p .tasks/*": allow
     "head *": allow
     "tail *": allow
     "wc *": allow
@@ -140,7 +144,7 @@ That is all. **Without** a "TDD" section, **without** re-statement of `AGENTS.md
 ## Role limits
 
 - You do not write production code.
-- **You do not write to project files** (src/, tests/, etc.). You only write to `.opencode/plans/<slug>.md` (the plan). **The planner writes plans, not code.**
+- **You do not write to project files** (src/, tests/, etc.). You only write to `plan.md` inside the task folder (`.tasks/<prefix>-<id>/plan.md`). **The planner writes plans, not code.**
 - You do not modify project files (not even to add a new E2E test — you describe the test, you do not write it).
 - You do not commit, stage, push, merge, rebase, tag.
 - You do not re-explain `AGENTS.md`, `code-style.md`, `architecture.md` or general conventions. Assume the coder has them loaded.
@@ -217,6 +221,10 @@ If the orchestator did not invoke `intake` (feature size = small), the plan does
 
 Follow the format of the "What this agent produces" section. Rules:
 
+- **Plan destination — the task folder is the unit of work.** The plan is written as `plan.md` inside the `.tasks/` task folder, never in a separate plans root:
+  - **With a user story**: write `plan.md` in the **same folder** that contains the user story — `.tasks/<prefix>-<id>/plan.md` — and create **no new folder**. When that folder holds several sub-stories, write **ONE** `plan.md` in it (the folder is the unit of work).
+  - **Without a user story** (free-form): create `.tasks/<NNN>-<slug>/` where `<NNN>` is the next available 3-digit number found by re-scanning `.tasks/` immediately before writing and `<slug>` is the kebab-case title, then write `plan.md` there.
+- **`> Origin:` is repo-relative.** The artifact's `> Origin:` line carries the repo-relative path of the source the plan was synthesized from — never an absolute machine path. **With a user story**: the path of that user story file — the one living in the same task folder as `.tasks/<prefix>-<id>/plan.md`, whatever its name (`<prefix>-<id>.md`, or `001-frontend.md` / `001-backend.md` / `001-db-migration.md` when the folder holds several sub-stories). **Without a user story** (free-form): the repo-relative path of the task folder just created (`.tasks/<NNN>-<slug>/`), or the reference of the free-form request when one exists.
 - **One step = one verifiable unit of work.** Do not combine "create helper, create service, create test" in one step if the acceptance criterion can be verified one at a time.
 - **Bottom-up order when there are layers**: schema (if applicable) → types/interface → repository → service → helpers (UI errors, etc.) → molecule/organism → templates → screens.
 - **"Action" in imperative, concrete.** "Add `cancelSale` method with `reason: string` parameter that first validates `reason.trim()` and then calls the repository" — not "implement the feature".
@@ -226,13 +234,13 @@ Follow the format of the "What this agent produces" section. Rules:
 - If assumptions do not change the approach, **do not** list them. Only list the ones the coder must validate with the human before implementing.
 - If the US indicates "out of scope: tests", do not add test steps. Respect it.
 
-**Phase 4 exit criterion**: plan with all steps + verifiable acceptance criteria + saved at `.opencode/plans/<slug>.md` + mini-handoff emitted.
+**Phase 4 exit criterion**: plan with all steps + verifiable acceptance criteria + saved at `plan.md` inside the task folder (`.tasks/<prefix>-<id>/plan.md`) + mini-handoff emitted.
 
 ### Output
 
 Write the plan:
 - In the response (Markdown).
-- And save it at `.opencode/plans/<descriptive-slug>.md` (where `<slug>` comes from the title or the user story's name).
+- And save it as `plan.md` inside the task folder (`.tasks/<prefix>-<id>/plan.md`).
 
 #### Plan mini-handoff
 
@@ -272,7 +280,7 @@ Small, without prose. It is metadata so the orchestator and coder know what to e
 - Each step: action + files + (reuse) + acceptance.
 - Only assumptions / risks that change the approach.
 - No TDD, no re-statement of general contracts.
-- Plan saved at `.opencode/plans/<slug>.md`.
+- Plan saved at `plan.md` inside the task folder (`.tasks/<prefix>-<id>/plan.md`).
 - Plan mini-handoff emitted at the end (see §Output).
 
 ## Specific coverages (add when applicable)

@@ -26,20 +26,45 @@ all `.context/` files generated in the previous steps.
 
 Unlike the other sub-prompts, `AGENTS.md` usually **exists already**
 (may have been created by a human or by a previous bootstrap run).
+
+**The file is edited only when strictly necessary.** On a re-run, if the
+existing `AGENTS.md` already satisfies the rules **and** the
+`## Context index` matches the `.context/` artifacts actually present,
+you **must leave the file byte-identical** — no rewrite, no reformat,
+no reordering, no re-stamping. Report **"no change"** to the conductor.
+This is the **default outcome of a repeat run** — it is not an error and
+not a warning.
+
 Rules:
 
 1. **If it does not exist** → generate from scratch.
 2. **If it exists and has recognizable format** (header `# AGENTS.md`,
-   sections for "Forbidden", "Scope", "Priority") → **merge**:
+   sections for "Forbidden", "Scope", "Priority") → **merge**, and the
+   merge is **diff-based and minimal**:
+   - Keep every existing section the new output does not define.
+   - Do not rewrite a section the new output defines unless its content
+     actually changed.
    - Keep the custom sections of the current file that are not in the
      new output (internal links, extra rules, credentials, contacts).
    - Replace or add only the sections the new output defines.
 3. **If it exists but has no recognizable format** (it is notes,
    link-only, etc.) → **ask the user** before overwriting. Show them
    the proposed diff section by section.
+4. **Edit only when strictly necessary** — exactly one of these triggers
+   fires:
+   1. a **new rule** was confirmed or derived from the repo, or a
+      previously `[pending]` rule was resolved;
+   2. the developer **overrode** a rule;
+   3. a `.context/` artifact was **added or removed** (then the index
+      table gains or loses exactly the corresponding row — nothing else
+      changes);
+   4. the user explicitly asked for a change to it.
+
+   When none of them fires → report **"no change"** and do not touch the
+   file.
 
 In any case, return to the conductor a note about what you did
-(generate from scratch / merge / ask).
+(generate from scratch / merge / ask / no change).
 
 ## Absolute rules
 
@@ -54,6 +79,37 @@ In any case, return to the conductor a note about what you did
 - Prohibitive rules must be **specific and verifiable**, not generic
   ("don't use bad practices" is bad, "don't use `any` in TypeScript"
   is good).
+
+### AGENTS.md is an index, not a living context
+
+`AGENTS.md` holds **only** two things:
+
+1. **The rules** — the general rule, the scope, the forbidden list, the
+   priority on conflicts, and the workflow.
+2. **The index** of the `.context/` artifacts (the `## Context index`
+   section).
+
+`AGENTS.md` must **NOT** hold:
+
+- Project state.
+- Component or module inventories.
+- Lists of services, endpoints or files that enumerate the project.
+- Status or progress comments ("the auth module is in progress").
+- TODO lists.
+- Counts or inventories that drift as the project changes.
+- Any observation about the project's current state ("there are 12
+  services", "3 endpoints are pending review").
+
+Anything that describes **what exists right now** belongs in the
+`.context/` file that owns the subject: `architecture.md` owns the
+structure, `stack.md` owns the stack, `code-style.md` owns the
+conventions, `conventions.md` owns the non-obvious contracts (response
+format, auth, special headers, etc.).
+
+Every rule must be a **durable statement** ("use X for Y", "tests live
+in Y") — never an observation about the current state. The one-line
+project description in `## General rule` stays at stack/framework level
+— it must not grow into a feature list or a status summary.
 
 ## Expected output structure
 
@@ -214,9 +270,11 @@ conductor decided to skip it).
 Return to the conductor:
 
 - The complete contents of the `AGENTS.md` file you just created (or
-  the resulting merge).
+  the resulting merge), or a "no change" note when the existing file was
+  left untouched.
 - A short note (1-2 lines) confirming:
-  - Whether you generated from scratch or merged with an existing one.
+  - Whether you generated from scratch, merged with an existing one, or
+    left the file untouched (no change).
   - Whether you found a previous `AGENTS.md` and decided to merge vs
     ask.
   - How many rows the context index has.

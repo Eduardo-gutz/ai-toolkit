@@ -125,7 +125,11 @@ export async function dispatch({
 }) {
   const cmd = argv[0];
 
-  if (!cmd || cmd === '--help' || cmd === '-h') {
+  // A help flag means HELP, never an action — wherever it appears. Without
+  // this, `init --help` installs into the current directory and `sync
+  // --help` rewrites it: asking for help must never change anything.
+  if (!cmd || cmd === '--help' || cmd === '-h' ||
+      argv.includes('--help') || argv.includes('-h')) {
     showHelp(stdout);
     exit(0); // Fix 1.1: --help must exit 0 (POSIX convention)
     return;

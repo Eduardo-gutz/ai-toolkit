@@ -15,6 +15,7 @@ import {
   adaptConductorPaths,
   BOOTSTRAP_SUPPORTING_FILES,
 } from '../_shared/bootstrap-renderer.mjs';
+import { PROMPT_PACKS, readPromptPack, adaptPackPaths, validatePromptPack, writePackFile } from '../_shared/prompt-pack.mjs';
 import {
   readState,
   writeState,
@@ -114,6 +115,17 @@ export async function sync({ source, target, config, types }) {
       await installBootstrap({ source, target }, { force: true });
     } catch (err) {
       console.warn(`[claude-code] bootstrap reinstall failed: ${err.message}. Continuing.`);
+    }
+  }
+  // The greenfield pack has the same wipe+recreate requirement: sync must
+  // propagate source modifications to source/prompts/greenfield/.
+  // This MUST also run BEFORE the lifecycle.sync loop below, so the
+  // wipe + recreate completes before any other sync-only hook fires.
+  {
+    try {
+      await installGreenfield({ source, target }, { force: true });
+    } catch (err) {
+      console.warn(`[claude-code] greenfield reinstall failed: ${err.message}. Continuing.`);
     }
   }
   recordSync(state, 'claude-code');
@@ -326,10 +338,15 @@ async function postRemoveCleanup(target, state, toolName, options = {}) {
 }
 
 /**
- * Shallow smoke test: walks source/<type>/ and returns { ok: true } if
- * none throw. Does NOT check semantic validity of resources, nor that
- * target exists (validate runs BEFORE install). For deeper checks, use
- * the `validate` CLI command.
+ * Smoke test: walks source/<type>/ and returns { ok: true } if none throw,
+ * then verifies every registered prompt pack the source SHIPS is complete.
+ *
+ * The pack check is strict about the files of a pack that is present: a
+ * missing pack file throws an error naming every absent file, so
+ * `ai-toolkit validate` points at the exact file to restore. A source that
+ * ships no prompts at all is not a broken pack — the check is skipped for
+ * the packs it does not have.
+ *
  * @returns {Promise<{ok: true}>}
  */
 // validate runs BEFORE install — target doesn't exist yet. Walkers read
@@ -339,6 +356,12 @@ export async function validate({ source, config }) {
   listSkills(source);
   listMcps(source);
   listRules(source);
+  // Every registered prompt pack the source ships must be complete: a
+  // half-present pack would install a broken command into the target.
+  // `required: false` — a source with no prompts/ directory ships no pack,
+  // which is not a broken pack.
+  validatePromptPack(source, 'bootstrap', { required: false });
+  validatePromptPack(source, 'greenfield', { required: false });
   return { ok: true };
 }
 
@@ -392,19 +415,23 @@ export async function installBootstrap({ source, target }, options = {}) {
   const { force = false } = options;
   const bootstrapDir = join(target, CLAUDE_BOOTSTRAP_DIR);
 
+  if (existsSync(bootstrapDir) && !force) {
+    console.log(
+      `  → Bootstrap skill already exists at ${CLAUDE_BOOTSTRAP_DIR}/. ` +
+      `Skipping (delete the directory to reinstall).`
+    );
+    return { installed: false };
+  }
+
+  // Read the whole pack BEFORE touching the target: a missing or incomplete
+  // source pack must throw without destroying the existing install and
+  // without leaving a half-written bootstrap dir behind.
+  const { conductor, supportingFiles } = readBootstrapSource(source);
+
   if (existsSync(bootstrapDir)) {
-    if (!force) {
-      console.log(
-        `  → Bootstrap skill already exists at ${CLAUDE_BOOTSTRAP_DIR}/. ` +
-        `Skipping (delete the directory to reinstall).`
-      );
-      return { installed: false };
-    }
     // force=true: wipe existing so source changes propagate.
     await rm(bootstrapDir, { recursive: true, force: true });
   }
-
-  const { conductor, supportingFiles } = readBootstrapSource(source);
 
   // Claude Code: conductor paths are rewritten to `./0X-...` (relative to
   // the skill directory).
@@ -449,6 +476,168 @@ export async function uninstallBootstrap({ target }) {
   return { removed: true };
 }
 
+// ─── Greenfield skill (Claude Code) ───────────────────────────────────────
+//
+// Single source of truth: <source>/prompts/greenfield/ in the toolkit repo.
+// installGreenfield() renders a Claude Code skill at .claude/skills/greenfield/
+// with frontmatter + the conductor body (paths adjusted to ./0X-... and
+// ./defaults/... relative refs) + 9 supporting files and 11 catalog assets
+// (byte-by-byte copies).
+//
+// The greenfield skill deliberately does NOT declare `context: fork`, unlike
+// the bootstrap skill: the interview needs the human channel, and a forked
+// skill runs isolated without one.
+//
+// Source files are NEVER modified by this adapter.
+
+const CLAUDE_GREENFIELD_DIR = '.claude/skills/greenfield';
+const CLAUDE_GREENFIELD_SKILL = 'SKILL.md';
+const CLAUDE_GREENFIELD_FRONTMATTER = `---
+name: greenfield
+description: >
+  Initializes the project context guide (AGENTS.md + .context/) for a
+  NEW/greenfield project with nothing substantive to extract patterns from.
+  Interviews the developer for their standards and fills the rest from
+  the detected stack defaults. Trigger: "/greenfield".
+disable-model-invocation: true
+---
+`;
+
+/**
+ * Install or re-install the greenfield skill in the target project.
+ *
+ * The pack's ENTRY POINT is `SKILL.md`, inside the skill directory. The
+ * directory alone is not an install: a leftover or hand-made directory
+ * must not make the skill disappear, and `init` must never clobber a
+ * skill the toolkit did not write.
+ *
+ * By default (force=false): idempotent — skip when the skill is already
+ * installed; REPAIR a partial install (a directory without `SKILL.md`).
+ * Safe for `init` (don't clobber existing).
+ *
+ * With force=true: wipe and recreate the greenfield dir unconditionally.
+ * Required for `sync` so source modifications propagate.
+ *
+ * @param {{source: string, target: string}} args
+ * @param {{force?: boolean}} [options]
+ * @returns {Promise<{installed: boolean}>}
+ */
+export async function installGreenfield({ source, target }, options = {}) {
+  const { force = false } = options;
+  const greenfieldDir = join(target, CLAUDE_GREENFIELD_DIR);
+  const skillFile = join(greenfieldDir, CLAUDE_GREENFIELD_SKILL);
+
+  // Read the whole pack BEFORE touching the target: a missing or incomplete
+  // source pack must throw without destroying the existing install and
+  // without leaving a half-written greenfield dir behind.
+  const { conductor, supportingFiles, assets } = readPromptPack(source, 'greenfield');
+
+  // Claude Code: conductor paths are rewritten to `./0X-...` and
+  // `./defaults/...` (relative to the skill directory).
+  const pathMapping = Object.fromEntries(
+    [...PROMPT_PACKS.greenfield.supporting, ...PROMPT_PACKS.greenfield.assets]
+      .map((name) => [name, `./${name}`])
+  );
+  const packFileNames = Object.keys(pathMapping);
+  const adjustedConductor = adaptPackPaths(conductor, packFileNames, pathMapping);
+
+  // The supporting files reference their pack siblings too (e.g. the
+  // interview prompt points at the standards prompt and at the catalog).
+  // Rewrite those references with the very same mapping, so the whole
+  // installed skill speaks one syntax. Claude Code's native form is the
+  // same relative `./` form, so this rewrite is a no-op there.
+  const adjustedSupportingFiles = supportingFiles.map((file) => ({
+    name: file.name,
+    content: adaptPackPaths(file.content, packFileNames, pathMapping),
+  }));
+
+  // What this adapter would write. A file already at the destination that
+  // matches it byte for byte is the toolkit's own; one that does not is
+  // the user's (or one they edited) and must not be touched.
+  const expectedSkill = CLAUDE_GREENFIELD_FRONTMATTER + adjustedConductor;
+
+  const dirExists = existsSync(greenfieldDir);
+  const skillExists = existsSync(skillFile);
+
+  if (!force) {
+    if (dirExists && skillExists) {
+      const actual = await readFile(skillFile, 'utf8');
+      if (actual === expectedSkill) {
+        console.log(
+          `  → Greenfield skill already installed at ${CLAUDE_GREENFIELD_DIR}/. ` +
+          `Skipping.`
+        );
+      } else {
+        console.log(
+          `  → ${CLAUDE_GREENFIELD_DIR}/${CLAUDE_GREENFIELD_SKILL} differs from the ` +
+          `toolkit version. Skipping — remove it to install /greenfield.`
+        );
+      }
+      return { installed: false };
+    }
+    if (dirExists && !skillExists) {
+      // A partial install: the directory exists but the skill's entry
+      // point does not. Completing it only adds the pack's own files; a
+      // file already there that the toolkit did not write is left alone.
+      console.log(
+        `  → Greenfield directory found without ${CLAUDE_GREENFIELD_SKILL}. ` +
+        `Completing the install.`
+      );
+    }
+  }
+
+  if (force && existsSync(greenfieldDir)) {
+    // force=true: wipe existing so source changes propagate. This is what
+    // `sync` does — restoring the source is its whole job.
+    await rm(greenfieldDir, { recursive: true, force: true });
+  }
+
+  const conflicts = [];
+  const skillResult = await writePackFile(skillFile, expectedSkill, { force });
+  if (skillResult === 'conflict') conflicts.push(skillFile);
+
+  for (const file of adjustedSupportingFiles) {
+    const dst = join(greenfieldDir, file.name);
+    const result = await writePackFile(dst, file.content, { force });
+    if (result === 'conflict') conflicts.push(dst);
+  }
+
+  for (const asset of assets) {
+    const dst = join(greenfieldDir, asset.name);
+    const result = await writePackFile(dst, asset.content, { force });
+    if (result === 'conflict') conflicts.push(dst);
+  }
+
+  if (conflicts.length > 0) {
+    console.log(
+      `  → ${conflicts.length} file(s) left untouched because they differ from the toolkit version:\n` +
+      conflicts.map((path) => `      ${path}`).join('\n')
+    );
+  }
+
+  return { installed: true };
+}
+
+/**
+ * Remove the greenfield skill from the target project.
+ * Idempotent: skip if the greenfield dir doesn't exist.
+ *
+ * Removes the entire `.claude/skills/greenfield/` directory.
+ *
+ * @param {{target: string}} args
+ * @returns {Promise<{removed: boolean}>} true if removed, false if already absent
+ */
+export async function uninstallGreenfield({ target }) {
+  const greenfieldDir = join(target, CLAUDE_GREENFIELD_DIR);
+
+  if (!existsSync(greenfieldDir)) {
+    return { removed: false };
+  }
+
+  await rm(greenfieldDir, { recursive: true, force: true });
+  return { removed: true };
+}
+
 // ─── Lifecycle registry ───────────────────────────────────────────────────
 //
 // Lifecycle hooks: adding a new extra (lint rules, security hooks,
@@ -470,9 +659,13 @@ export async function uninstallBootstrap({ target }) {
 // before the cleanup pass that sweeps them up).
 const lifecycle = createLifecycle();
 lifecycle.install.push(installBootstrap);
+lifecycle.install.push(installGreenfield);
 // lifecycle.sync is intentionally empty — reserved for future sync-only
-// extras (e.g., lint rules). Do NOT push installBootstrap here.
+// extras (e.g., lint rules). Do NOT push installBootstrap or
+// installGreenfield here: the direct calls in sync() (with force=true)
+// handle the wipe + recreate.
 lifecycle.remove.push(uninstallBootstrap);
+lifecycle.remove.push(uninstallGreenfield);
 
 export { lifecycle };
 

@@ -15,6 +15,7 @@ import {
   adaptConductorPaths,
   BOOTSTRAP_SUPPORTING_FILES,
 } from '../_shared/bootstrap-renderer.mjs';
+import { PROMPT_PACKS, readPromptPack, adaptPackPaths, validatePromptPack, writePackFile } from '../_shared/prompt-pack.mjs';
 import {
   readState,
   writeState,
@@ -115,6 +116,17 @@ export async function sync({ source, target, config, types }) {
       await installBootstrap({ source, target }, { force: true });
     } catch (err) {
       console.warn(`[opencode] bootstrap reinstall failed: ${err.message}. Continuing.`);
+    }
+  }
+  // The greenfield pack has the same wipe+recreate requirement: sync must
+  // propagate source modifications to source/prompts/greenfield/.
+  // This MUST also run BEFORE the lifecycle.sync loop below, so the
+  // wipe + recreate completes before any other sync-only hook fires.
+  {
+    try {
+      await installGreenfield({ source, target }, { force: true });
+    } catch (err) {
+      console.warn(`[opencode] greenfield reinstall failed: ${err.message}. Continuing.`);
     }
   }
   recordSync(state, 'opencode');
@@ -320,10 +332,15 @@ async function postRemoveCleanup(target, state, toolName, options = {}) {
 }
 
 /**
- * Shallow smoke test: walks source/<type>/ and returns { ok: true } if
- * none throw. Does NOT check semantic validity of resources, nor that
- * target exists (validate runs BEFORE install). For deeper checks, use
- * the `validate` CLI command.
+ * Smoke test: walks source/<type>/ and returns { ok: true } if none throw,
+ * then verifies every registered prompt pack the source SHIPS is complete.
+ *
+ * The pack check is strict about the files of a pack that is present: a
+ * missing pack file throws an error naming every absent file, so
+ * `ai-toolkit validate` points at the exact file to restore. A source that
+ * ships no prompts at all is not a broken pack — the check is skipped for
+ * the packs it does not have.
+ *
  * @returns {Promise<{ok: true}>}
  */
 // validate runs BEFORE install — target doesn't exist yet. Walkers read
@@ -333,6 +350,12 @@ export async function validate({ source, config }) {
   listSkills(source);
   listMcps(source);
   listRules(source);
+  // Every registered prompt pack the source ships must be complete: a
+  // half-present pack would install a broken command into the target.
+  // `required: false` — a source with no prompts/ directory ships no pack,
+  // which is not a broken pack.
+  validatePromptPack(source, 'bootstrap', { required: false });
+  validatePromptPack(source, 'greenfield', { required: false });
   return { ok: true };
 }
 
@@ -394,14 +417,20 @@ export async function installBootstrap({ source, target }, options = {}) {
   // subdir would not be detected here, but such a state is broken anyway
   // (the command references files that don't exist) and reinstalling
   // recovers it.
+  if (existsSync(bootstrapSubdir) && !force) {
+    console.log(
+      `  → Bootstrap command already exists at ${OPENCODE_BOOTSTRAP_FILE}. ` +
+      `Skipping (delete the file/dir to reinstall).`
+    );
+    return { installed: false };
+  }
+
+  // Read the whole pack BEFORE touching the target: a missing or incomplete
+  // source pack must throw without destroying the existing install and
+  // without leaving a half-written bootstrap dir behind.
+  const { conductor, supportingFiles } = readBootstrapSource(source);
+
   if (existsSync(bootstrapSubdir)) {
-    if (!force) {
-      console.log(
-        `  → Bootstrap command already exists at ${OPENCODE_BOOTSTRAP_FILE}. ` +
-        `Skipping (delete the file/dir to reinstall).`
-      );
-      return { installed: false };
-    }
     // force=true: wipe existing artifacts so source changes propagate.
     // The outer existsSync check guarantees bootstrapSubdir exists here,
     // so no inner check needed. `rm({force:true})` is a no-op on missing
@@ -411,8 +440,6 @@ export async function installBootstrap({ source, target }, options = {}) {
       await rm(bootstrapFile, { force: true });
     }
   }
-
-  const { conductor, supportingFiles } = readBootstrapSource(source);
 
   // OpenCode: conductor paths are rewritten to `@0X-...` (OpenCode's native
   // reference syntax for sibling files of the command).
@@ -463,6 +490,196 @@ export async function uninstallBootstrap({ target }) {
   return { removed: true };
 }
 
+// ─── Greenfield command (OpenCode) ────────────────────────────────────────
+//
+// Single source of truth: <source>/prompts/greenfield/ in the toolkit repo.
+// installGreenfield() renders an OpenCode command at .opencode/commands/
+// with frontmatter (command spec compliant) + the conductor body (paths
+// adjusted to @0X-... and @defaults/... references) + 9 supporting files
+// and 11 catalog assets (byte-by-byte copies).
+//
+// Source files are NEVER modified by this adapter.
+
+const OPENCODE_GREENFIELD_FILE = '.opencode/commands/greenfield.md';
+const OPENCODE_GREENFIELD_SUBDIR = '.opencode/commands/greenfield';
+const OPENCODE_GREENFIELD_FRONTMATTER = `---
+description: >
+  Initializes the project context guide (AGENTS.md + .context/) for a
+  NEW/greenfield project with nothing substantive to extract patterns from.
+  Interviews the developer for their standards and fills the rest from
+  the detected stack defaults.
+subtask: false
+---
+`;
+
+/**
+ * Install or re-install the greenfield command in the target project.
+ *
+ * The pack has TWO artifacts: the command file (`greenfield.md`) and the
+ * supporting directory (`greenfield/`). The pack counts as installed when
+ * BOTH are present. A partial state is repaired, not skipped: a leftover
+ * directory must not make the command disappear, and a missing directory
+ * must not leave the command pointing at files that are not there.
+ *
+ * By default (force=false): `init` is NON-DESTRUCTIVE. A `greenfield.md`
+ * that the toolkit did not write is the user's own command and is never
+ * overwritten — the install is skipped with a message that says so.
+ *
+ * With force=true: wipe and recreate both artifacts unconditionally.
+ * Required for `sync` so source modifications propagate.
+ *
+ * OpenCode's stored command templates do NOT expand `@path` — it stays
+ * ordinary prompt text (see the OpenCode command docs, "Attachments").
+ * The `@` prefix is therefore a convention, not a resolver: it tells the
+ * agent that the file is a sibling of the command, and the agent opens it
+ * with its own file tools. Rewriting the pack's references keeps that
+ * convention consistent with the tool's syntax instead of leaking
+ * Claude Code's `./` form into an OpenCode install.
+ *
+ * @param {{source: string, target: string}} args
+ * @param {{force?: boolean}} [options]
+ * @returns {Promise<{installed: boolean}>}
+ */
+export async function installGreenfield({ source, target }, options = {}) {
+  const { force = false } = options;
+  const greenfieldFile = join(target, OPENCODE_GREENFIELD_FILE);
+  const greenfieldSubdir = join(target, OPENCODE_GREENFIELD_SUBDIR);
+
+  // Read the whole pack BEFORE touching the target: a missing or incomplete
+  // source pack must throw without destroying the existing install and
+  // without leaving a half-written greenfield dir behind.
+  const { conductor, supportingFiles, assets } = readPromptPack(source, 'greenfield');
+
+  // OpenCode: conductor paths are rewritten to `@0X-...` (OpenCode's native
+  // reference syntax for sibling files of the command).
+  const pathMapping = Object.fromEntries(
+    [...PROMPT_PACKS.greenfield.supporting, ...PROMPT_PACKS.greenfield.assets]
+      .map((name) => [name, `@${name}`])
+  );
+  const packFileNames = Object.keys(pathMapping);
+  const adjustedConductor = adaptPackPaths(conductor, packFileNames, pathMapping);
+
+  // The supporting files reference their pack siblings too (e.g. the
+  // interview prompt points at the standards prompt and at the catalog).
+  // Rewrite those references with the very same mapping, so the whole
+  // installed command speaks one syntax.
+  const adjustedSupportingFiles = supportingFiles.map((file) => ({
+    name: file.name,
+    content: adaptPackPaths(file.content, packFileNames, pathMapping),
+  }));
+
+  // What this adapter would write. A file already at the destination that
+  // matches it byte for byte is the toolkit's own; one that does not is
+  // the user's (or one they edited) and must not be touched.
+  const expectedCommand = OPENCODE_GREENFIELD_FRONTMATTER + adjustedConductor;
+
+  const fileExists = existsSync(greenfieldFile);
+  const dirExists = existsSync(greenfieldSubdir);
+
+  if (!force) {
+    if (fileExists && dirExists) {
+      const actual = await readFile(greenfieldFile, 'utf8');
+      if (actual === expectedCommand) {
+        console.log(
+          `  → Greenfield command already installed at ${OPENCODE_GREENFIELD_FILE}. ` +
+          `Skipping.`
+        );
+      } else {
+        console.log(
+          `  → ${OPENCODE_GREENFIELD_FILE} differs from the toolkit version. ` +
+          `Skipping — remove it to install /greenfield.`
+        );
+      }
+      return { installed: false };
+    }
+    if (fileExists && !dirExists) {
+      // The command file is there but its supporting files are not. If the
+      // file is not exactly what the toolkit writes, it was edited — or it
+      // is the user's own command. Either way `init` does not touch it.
+      const actual = await readFile(greenfieldFile, 'utf8');
+      if (actual !== expectedCommand) {
+        console.log(
+          `  → ${OPENCODE_GREENFIELD_FILE} differs from the toolkit version. ` +
+          `Skipping — remove it to install /greenfield.`
+        );
+        return { installed: false };
+      }
+      console.log(
+        `  → Greenfield command found without its supporting files. Completing the install.`
+      );
+    }
+    if (!fileExists && dirExists) {
+      console.log(
+        `  → Greenfield supporting files found without ${OPENCODE_GREENFIELD_FILE}. ` +
+        `Completing the install.`
+      );
+    }
+  }
+
+  if (force) {
+    // force=true: wipe existing artifacts so source changes propagate.
+    // This is what `sync` does — restoring the source is its whole job.
+    await rm(greenfieldSubdir, { recursive: true, force: true });
+    if (existsSync(greenfieldFile)) {
+      await rm(greenfieldFile, { force: true });
+    }
+  }
+
+  const conflicts = [];
+  const commandResult = await writePackFile(greenfieldFile, expectedCommand, { force });
+  if (commandResult === 'conflict') conflicts.push(greenfieldFile);
+
+  for (const file of adjustedSupportingFiles) {
+    const dst = join(greenfieldSubdir, file.name);
+    const result = await writePackFile(dst, file.content, { force });
+    if (result === 'conflict') conflicts.push(dst);
+  }
+
+  for (const asset of assets) {
+    const dst = join(greenfieldSubdir, asset.name);
+    const result = await writePackFile(dst, asset.content, { force });
+    if (result === 'conflict') conflicts.push(dst);
+  }
+
+  if (conflicts.length > 0) {
+    console.log(
+      `  → ${conflicts.length} file(s) left untouched because they differ from the toolkit version:\n` +
+      conflicts.map((path) => `      ${path}`).join('\n')
+    );
+  }
+
+  return { installed: true };
+}
+
+/**
+ * Remove the greenfield command from the target project.
+ * Idempotent: skip if neither greenfield artifact exists.
+ *
+ * Removes `.opencode/commands/greenfield.md` and the supporting files in
+ * `.opencode/commands/greenfield/`. Robust to orphan states — deletes
+ * whichever artifacts exist, leaves the filesystem clean either way.
+ *
+ * @param {{target: string}} args
+ * @returns {Promise<{removed: boolean}>} true if any artifact was removed,
+ *   false if neither existed
+ */
+export async function uninstallGreenfield({ target }) {
+  const greenfieldFile = join(target, OPENCODE_GREENFIELD_FILE);
+  const greenfieldSubdir = join(target, OPENCODE_GREENFIELD_SUBDIR);
+
+  if (!existsSync(greenfieldFile) && !existsSync(greenfieldSubdir)) {
+    return { removed: false };
+  }
+
+  if (existsSync(greenfieldSubdir)) {
+    await rm(greenfieldSubdir, { recursive: true, force: true });
+  }
+  if (existsSync(greenfieldFile)) {
+    await rm(greenfieldFile, { force: true });
+  }
+  return { removed: true };
+}
+
 // ─── Lifecycle registry ───────────────────────────────────────────────────
 //
 // Lifecycle hooks: adding a new extra (lint rules, security hooks,
@@ -486,9 +703,13 @@ export async function uninstallBootstrap({ target }) {
 // — it is part of the structural cleanup, not an extra.
 const lifecycle = createLifecycle();
 lifecycle.install.push(installBootstrap);
+lifecycle.install.push(installGreenfield);
 // lifecycle.sync is intentionally empty — reserved for future sync-only
-// extras (e.g., lint rules). Do NOT push installBootstrap here.
+// extras (e.g., lint rules). Do NOT push installBootstrap or
+// installGreenfield here: the direct calls in sync() (with force=true)
+// handle the wipe + recreate.
 lifecycle.remove.push(uninstallBootstrap);
+lifecycle.remove.push(uninstallGreenfield);
 
 export { lifecycle };
 

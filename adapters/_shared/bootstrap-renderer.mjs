@@ -1,33 +1,46 @@
 // adapters/_shared/bootstrap-renderer.mjs
 //
-// Shared logic for installing the /bootstrap command in adapters that
-// support it (claude-code, opencode). The conductor and supporting files
-// live in <toolkitRoot>/source/prompts/bootstrap/ as the single source of
-// truth; each adapter only renders in its native format.
+// Legacy facade over the pack-aware shared renderer.
+//
+// The generic renderer lives in `adapters/_shared/prompt-pack.mjs` and
+// serves every prompt pack (bootstrap, greenfield). This module keeps the
+// *bootstrap-specific* public surface stable so existing adapters and
+// their tests keep working unchanged:
+//
+//   BOOTSTRAP_CONDUCTOR_FILE, BOOTSTRAP_SUPPORTING_FILES,
+//   readBootstrapSource(source)       → { conductor: string, supportingFiles: string[] }
+//   adaptConductorPaths(content, map) → string
+//
+// Note the shape difference, which is deliberate and preserved:
+//   - readBootstrapSource returns supporting files as an array of STRINGS
+//     (the legacy contract).
+//   - readPromptPack returns supporting files as an array of
+//     { name, content } OBJECTS (the pack-aware contract).
+//
+// Who owns what:
+//   - prompt-pack.mjs owns: the registry, reading a pack, rewriting paths,
+//     validating a pack.
+//   - THIS module owns: only the bootstrap-specific naming and the legacy
+//     string-array shape.
 //
 // This helper does NOT modify `source/prompts/bootstrap/` — it only reads.
 // It also does not know where each output goes: the adapter decides its
 // structure (SKILL.md vs command.md, ./0X vs @0X, etc.).
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { PROMPT_PACKS, readPromptPack, adaptPackPaths } from './prompt-pack.mjs';
 
-export const BOOTSTRAP_CONDUCTOR_FILE = '00-conductor.md';
+/** The bootstrap pack's conductor file name. */
+export const BOOTSTRAP_CONDUCTOR_FILE = PROMPT_PACKS.bootstrap.conductor;
 
-// Canonical order, alphabetical by name. Matches the source's numerical
-// ordering (01..09). Any new supporting file added to the source must appear
-// here in its corresponding position.
-export const BOOTSTRAP_SUPPORTING_FILES = Object.freeze([
-  '01-pre-flight.md',
-  '02-discovery.md',
-  '03-stack.md',
-  '04-architecture.md',
-  '05-code-style.md',
-  '06-conventions.md',
-  '07-examples.md',
-  '08-agents-md.md',
-  '09-prune.md',
-]);
+/**
+ * The bootstrap pack's 9 supporting files.
+ *
+ * Canonical order, alphabetical by name. Matches the source's numerical
+ * ordering (01..09). Derived from the shared pack registry, so a new
+ * supporting file added to the source must be registered there in its
+ * corresponding position.
+ */
+export const BOOTSTRAP_SUPPORTING_FILES = PROMPT_PACKS.bootstrap.supporting;
 
 /**
  * Reads the 10 files from the canonical bootstrap source.
@@ -40,12 +53,11 @@ export const BOOTSTRAP_SUPPORTING_FILES = Object.freeze([
  * @throws if any file is missing
  */
 export function readBootstrapSource(source) {
-  const sourceDir = join(source, 'prompts', 'bootstrap');
-  const conductor = readFileSync(join(sourceDir, BOOTSTRAP_CONDUCTOR_FILE), 'utf8');
-  const supportingFiles = BOOTSTRAP_SUPPORTING_FILES.map((name) =>
-    readFileSync(join(sourceDir, name), 'utf8')
-  );
-  return { conductor, supportingFiles };
+  const pack = readPromptPack(source, 'bootstrap');
+  return {
+    conductor: pack.conductor,
+    supportingFiles: pack.supportingFiles.map((file) => file.content),
+  };
 }
 
 /**
@@ -63,13 +75,6 @@ export function readBootstrapSource(source) {
  * @returns {string}
  */
 export function adaptConductorPaths(conductorContent, pathMapping) {
-  let result = conductorContent;
-  for (const name of BOOTSTRAP_SUPPORTING_FILES) {
-    if (pathMapping[name] === undefined) continue;
-    const from = `./${name}`;
-    const to = pathMapping[name];
-    result = result.split(from).join(to);
-  }
-  return result;
+  return adaptPackPaths(conductorContent, BOOTSTRAP_SUPPORTING_FILES, pathMapping);
 }
 

@@ -69,6 +69,26 @@ preserved verbatim, and a second `init` against the same project is a
 no-op (the block is replaced in place, never duplicated). `sync` and
 `remove` deliberately leave `.gitignore` alone.
 
+## Bootstrap commands
+
+Two prompt packs ship with the toolkit and are **both installed by
+default** — there is no flag to opt in:
+
+| Command | Kind | Needs existing code? | Use it when |
+|---|---|---|---|
+| `/bootstrap` | **Extractive** — reads the existing code and derives `.context/` + `AGENTS.md` from what it finds | Yes | The project already has substantive code |
+| `/greenfield` | **Generative** — interviews the developer for their standards and fills the rest from the detected stack's defaults | No | The project has no substantive patterns to extract yet |
+
+`/bootstrap` detects a repo with nothing substantive to extract patterns
+from during its pre-flight and **suggests switching to `/greenfield`**: the
+extractive flow has no patterns to derive from.
+
+The greenfield pack ships a stack-defaults catalog with these stacks:
+`node-typescript`, `python`, `react-native`, `react`, `nextjs`, `express`,
+`fastapi`, `php`, `android`, `ios` — plus a `_baseline` fallback used for
+any stack without a catalog entry (generic defaults only; the
+stack-specific fields stay `pending`).
+
 ## Status
 
 **Shipped**: Phase 0 (design) + Phase 1 (opencode adapter + CLI) + Phase 2 (claude-code adapter + shared helpers) + Phase 0.5 (security hardening: path traversal closed, adapter injection closed for all commands after loadAdapter migration, value-less flag crashes fixed).

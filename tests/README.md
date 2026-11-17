@@ -26,7 +26,10 @@ tests/
 ```
 
 Each test takes a fixture, runs the adapter's render function (no I/O),
-and compares to a snapshot. `tests/` runs with `node --test` (Node 20+
-built-in test runner, no extra deps).
+and compares to a snapshot. `tests/` runs on the Node 20+ built-in test
+runner, no extra deps. Use `npm test` (or `node scripts/run-tests.mjs`):
+it runs each test file in its own process, which sidesteps a known
+upstream Node.js supervisor crash (nodejs/node#66164) that makes the
+plain `node --test` invocation flaky.
 
 Status: planned (Phase 1).

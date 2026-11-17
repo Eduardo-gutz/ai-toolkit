@@ -80,9 +80,19 @@ Each target has its **own independent state file**. They don't interfere with ea
 ## 🧪 Test
 
 ```bash
-npm test                                    # 330 tests, all passing
-node --test $(find tests -name '*.test.mjs')  # Same, explicit
+npm test                                 # every tests/**/*.test.mjs, one process per file
+node scripts/run-tests.mjs               # Same, explicit
+node scripts/run-tests.mjs greenfield    # Only files whose path contains "greenfield"
 ```
+
+> **Why the custom runner?** `node --test` is a supervisor: it spawns one
+> child per test file and multiplexes the child's stdout with its own
+> event frames. When the stray stdout mimics a frame header, the whole
+> run aborts with `Unable to deserialize cloned data due to invalid or
+> unsupported version.` — an upstream Node.js bug (nodejs/node#66164,
+> fixed on `main` but not in any v24.x release). `scripts/run-tests.mjs`
+> runs each file in its own process, which removes the supervisor and the
+> misinterpreted pipe.
 
 **Coverage notes**:
 - `parseFlags` (Fase 0.5): 23 unit tests cover happy path + value-less flags + boolean flags + `--config=path/with=equals.json` + POSIX separator.

@@ -53,6 +53,28 @@ Invoke the sub-agent with the contents of that file + the path to the
 target repo. Wait for the result. If it fails, **do not continue** —
 report to the user.
 
+#### Greenfield branch
+
+If the pre-flight result carries `greenfield: true`, the repo has
+nothing substantive to extract from. Before running step 1, explain the
+two commands to the developer:
+
+- `/bootstrap` — **extractive**: reads the code that already exists and
+  produces `.context/` + `AGENTS.md` from what it finds.
+- `/greenfield` — **generative**: for a project with nothing substantive
+  to extract from yet; interviews the developer for their standards and
+  fills the rest from the detected stack's defaults.
+
+Then warn the developer: in a repo with nothing substantive to extract
+from, `/bootstrap` has nothing to extract and would produce empty or
+pending context.
+
+Then ask: "This project looks new — switch to `/greenfield`?"
+
+- **Yes** → **stop the chain**: steps 1–8 do not run. Tell the developer
+  to start `/greenfield` in a clean turn.
+- **No** → continue with `/bootstrap` as usual (step 1 onward).
+
 ### Step 1 — Discovery
 
 Load `./02-discovery.md`.
